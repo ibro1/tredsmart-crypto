@@ -44,6 +44,18 @@ model User {
   profiles UserProfile[]
   pages    Page[]
   posts    Post[]
+  influencers Influencer[] @relation("UserInfluencers")
+
+  // Wallet
+  walletAddress String? @unique
+  walletConnectedAt DateTime?
+
+  // Trading
+  autoTrading Boolean @default(false)
+  tradeAmount Float?  // Amount in SOL
+  maxSlippage Float?  // Percentage
+  stopLoss    Float?  // Percentage
+  takeProfit  Float?  // Percentage
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -130,7 +142,7 @@ model Connection {
   providerId   String
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   userId String
@@ -154,6 +166,86 @@ model UserImage {
 
   @@unique([id, userId])
   @@index([userId])
+}
+
+model Influencer {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  username     String  @unique
+  name         String
+  description  String?
+  profileImage String?
+  followersCount Int
+  tweetsCount   Int
+  
+  users    User[]    @relation("UserInfluencers")
+  tweets   Tweet[]
+  @@map("influencers")
+}
+
+model Tweet {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  tweetId     String  @unique
+  content     String  @db.Text
+  postedAt    DateTime
+  influencer  Influencer @relation(fields: [influencerId], references: [id])
+  influencerId String
+  tokenSignal TokenSignal?
+
+  @@map("tweets")
+}
+
+model TokenSignal {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  tokenAddress String
+  tweet        Tweet    @relation(fields: [tweetId], references: [id])
+  tweetId      String   @unique
+  status       String   @default("pending") // pending, executed, failed
+  executedAt   DateTime?
+
+  trades Trade[]
+  
+  @@map("token_signals")
+}
+
+model Trade {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  tokenSignal   TokenSignal @relation(fields: [tokenSignalId], references: [id])
+  tokenSignalId String
+
+  inputAmount  Float
+  outputAmount Float?
+  tokenAddress String
+  status       String    @default("pending") // pending, completed, failed
+  txId         String?
+  error        String?   @db.Text
+  
+  // Stop loss and take profit
+  stopLoss     Float?
+  takeProfit   Float?
+  
+  // Fees
+  platformFee  Float    @default(0)
+  networkFee   Float    @default(0)
+  
+  executedAt   DateTime?
+  soldAt       DateTime?
+  soldAmount   Float?
+  soldTxId     String?
+  profitLoss   Float?
+
+  @@map("trades")
 }
 
 // -----------------------------------------------------------------------------
