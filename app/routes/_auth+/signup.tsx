@@ -12,18 +12,19 @@ import { FormDescription, FormErrors, FormField, FormLabel } from "~/components/
 import { Input } from "~/components/ui/input"
 import { InputPassword } from "~/components/ui/input-password"
 import { LinkText } from "~/components/ui/link-text"
+import { configUnallowedKeywords } from "~/configs/unallowed-keywords"
 import { useAppMode } from "~/hooks/use-app-mode"
 import { db } from "~/libs/db.server"
-import { schemaUserLogIn } from "~/schemas/user"
+import { modelUser } from "~/models/user.server"
+import { issueUsernameUnallowed, schemaUserSignUp } from "~/schemas/user"
 import { authService } from "~/services/auth.server"
-import { checkPassword } from "~/utils/encryption.server"
 import { createMeta } from "~/utils/meta"
 import { createTimer } from "~/utils/timer"
 
 export const meta: MetaFunction = () =>
   createMeta({
-    title: `Log In`,
-    description: `Continue to dashboard`,
+    title: `Sign Up`,
+    description: `Create a new account`,
   })
 
 export const loader = ({ request }: ActionFunctionArgs) => {
@@ -42,31 +43,38 @@ export default function SignUpRoute() {
   const [searchParams] = useSearchParams()
   const redirectTo = searchParams.get("redirectTo")
 
-  const [form, { email, password }] = useForm<z.infer<typeof schemaUserLogIn>>({
-    id: "login",
-    lastSubmission: actionData?.submission,
-    shouldRevalidate: "onInput",
-    constraint: getFieldsetConstraint(schemaUserLogIn),
-    onValidate({ formData }) {
-      return parse(formData, { schema: schemaUserLogIn })
+  const [form, { email, fullname, username, password }] = useForm<z.infer<typeof schemaUserSignUp>>(
+    {
+      id: "signup",
+      lastSubmission: actionData?.submission,
+      shouldRevalidate: "onInput",
+      constraint: getFieldsetConstraint(schemaUserSignUp),
+      onValidate({ formData }) {
+        return parse(formData, { schema: schemaUserSignUp })
+      },
+      defaultValue: isModeDevelopment
+        ? {
+            email: "example@example.com",
+            fullname: "Example Name",
+            username: "example",
+            password: "exampleexample",
+          }
+        : {},
     },
-    defaultValue: isModeDevelopment
-      ? { email: "example@example.com", password: "exampleexample" }
-      : {},
-  })
+  )
 
   return (
     <div className="site-container">
       <div className="site-section-md space-y-8">
         <header className="site-header">
           <h2 className="inline-flex items-center gap-2">
-            <IconMatch icon="sign-in" />
-            <span>Log in to continue</span>
+            <IconMatch icon="user-plus" />
+            <span>Create a new account</span>
           </h2>
           <p>
-            Don't have an account?{" "}
-            <LinkText to="/signup" className="transition hover:text-primary">
-              Sign up
+            Already have an account?{" "}
+            <LinkText to="/login" className="transition hover:text-primary">
+              Log in
             </LinkText>
           </p>
         </header>
@@ -80,13 +88,23 @@ export default function SignUpRoute() {
         <section>
           <Form
             replace
-            action="/login"
+            action="/signup"
             method="POST"
             className="flex flex-col gap-2"
             {...form.props}
           >
             <fieldset className="flex flex-col gap-2" disabled={isSubmitting}>
-              {redirectTo ? <input type="hidden" name="redirectTo" value={redirectTo} /> : null}
+              <FormField>
+                <FormLabel htmlFor={fullname.id}>Full Name</FormLabel>
+                <Input
+                  {...conform.input(fullname)}
+                  id={fullname.id}
+                  placeholder="Full Name"
+                  autoFocus={fullname.error ? true : undefined}
+                  required
+                />
+                <FormErrors>{fullname}</FormErrors>
+              </FormField>
 
               <FormField>
                 <FormLabel htmlFor={email.id}>Email</FormLabel>
@@ -106,24 +124,41 @@ export default function SignUpRoute() {
               </FormField>
 
               <FormField>
+                <FormLabel htmlFor={username.id}>Username</FormLabel>
+                <Input
+                  {...conform.input(username)}
+                  id={username.id}
+                  placeholder="username"
+                  autoFocus={username.error ? true : undefined}
+                  required
+                />
+                <FormDescription id={password.descriptionId}>
+                  4 to 20 characters (letters, numbers, dot, underscore)
+                </FormDescription>
+                <FormErrors>{username}</FormErrors>
+              </FormField>
+
+              <FormField>
                 <FormLabel htmlFor={password.id}>Password</FormLabel>
                 <InputPassword
                   {...conform.input(password, {
                     description: true,
                   })}
                   id={password.id}
-                  placeholder="Enter password"
+                  placeholder="Enter password (at least 8 characters)"
                   autoComplete="current-password"
                   autoFocus={password.error ? true : undefined}
                   required
                   className="w-full"
                 />
-                <FormDescription id={password.descriptionId}>At least 8 characters</FormDescription>
+                <FormDescription id={password.descriptionId}>8 characters or more</FormDescription>
                 <FormErrors>{password}</FormErrors>
               </FormField>
 
-              <ButtonLoading type="submit" loadingText="Logging In..." isLoading={isSubmitting}>
-                Log In
+              {redirectTo ? <input type="hidden" name="redirectTo" value={redirectTo} /> : null}
+
+              <ButtonLoading type="submit" loadingText="Signing Up..." isLoading={isSubmitting}>
+                Sign Up
               </ButtonLoading>
             </fieldset>
           </Form>
@@ -140,46 +175,50 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const submission = await parse(formData, {
     async: true,
-    schema: schemaUserLogIn.superRefine(async (data, ctx) => {
-      const existingUser = await db.user.findUnique({
+    schema: schemaUserSignUp.superRefine(async (data, ctx) => {
+      const unallowedUsername = configUnallowedKeywords.find(keyword => keyword === data.username)
+      if (unallowedUsername) {
+        ctx.addIssue(issueUsernameUnallowed)
+        return
+      }
+
+      const existingEmail = await db.user.findUnique({
         where: { email: data.email },
-        include: { password: true },
+        select: { id: true },
       })
-      if (!existingUser) {
+      if (existingEmail) {
         ctx.addIssue({
           path: ["email"],
           code: z.ZodIssueCode.custom,
-          message: "User with this email is not found",
-        })
-        return
-      }
-      if (!existingUser?.password) {
-        ctx.addIssue({
-          path: ["password"],
-          code: z.ZodIssueCode.custom,
-          message: "User cannot log in with a password. Try using 3rd party services below",
+          message: "Email cannot be used",
         })
         return
       }
 
-      const isPasswordCorrect = await checkPassword(data.password, existingUser.password.hash)
-      if (!isPasswordCorrect) {
-        ctx.addIssue({
-          path: ["password"],
-          code: z.ZodIssueCode.custom,
-          message: "Password is incorrect",
-        })
+      const existingUsername = await db.user.findUnique({
+        where: { username: data.username },
+        select: { id: true },
+      })
+      if (existingUsername) {
+        ctx.addIssue(issueUsernameUnallowed)
         return
       }
     }),
   })
 
-  await timer.delay()
-
   if (!submission.value || submission.intent !== "submit") {
+    await timer.delay()
     return json({ status: "error", submission }, { status: 400 })
   }
 
+  const newUser = await modelUser.signup(submission.value)
+
+  if (!newUser) {
+    await timer.delay()
+    return json({ status: "error", submission }, { status: 500 })
+  }
+
+  await timer.delay()
   return authService.authenticate("form", request, {
     successRedirect: "/user/dashboard",
   })

@@ -27,7 +27,7 @@ export const configNavigationItems: NavItem[] = [
     icon: "magnifying-glass",
   },
   {
-    isEnabled: true,
+    isEnabled: false,
     path: "/posts",
     text: "Posts",
     icon: "scroll",
@@ -57,8 +57,8 @@ export const configNavigationItems: NavItem[] = [
     shortcut: "⌘K+S",
   },
   {
-    path: "/user/billing",
-    text: "Billing",
+    path: "/user/transactions",
+    text: "Transactions",
     icon: "credit-card",
     shortcut: "⌘K+B",
   },

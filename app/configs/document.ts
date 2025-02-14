@@ -14,6 +14,7 @@ import tailwindStyles from "~/styles/tailwind.css"
 
 const stylesheetLinks = [
   { rel: "stylesheet", href: tailwindStyles },
+  { rel: "stylesheet", href: "/styles/wallet-adapter.css" },
   ...(cssBundleHref ? [{ rel: "stylesheet", href: cssBundleHref }] : []),
 ]
 
