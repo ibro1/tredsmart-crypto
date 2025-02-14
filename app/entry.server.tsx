@@ -5,8 +5,7 @@
  * For more information, see https://remix.run/file-conventions/entry.server
  */
 
-import { PassThrough } from "node:stream"
-
+import { PassThrough } from "stream"
 import {
   createReadableStreamFromReadable,
   type ActionFunctionArgs,
@@ -21,7 +20,10 @@ import { renderToPipeableStream } from "react-dom/server"
 
 import { isProduction, parsedEnv } from "~/utils/env.server"
 
-const ABORT_DELAY = 5_000
+// Initialize tweet processor
+import "~/queues/tweet-processor.server"
+
+const ABORT_DELAY = 5000
 
 export function handleError(error: unknown, { request }: { request: Request }) {
   if (isProduction) {
