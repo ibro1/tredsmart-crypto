@@ -1,0 +1,1 @@
+app/routes/_app+/_auth+ app/routes/_auth.auth.tsx app/routes/_auth.login.tsx app/routes/_auth.logout.tsx app/routes/_auth.signup.tsx app/routes/_auth.tsx
