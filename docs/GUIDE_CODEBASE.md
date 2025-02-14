@@ -17,6 +17,7 @@ Remix (React Router) routes inside `/app/routes`
 - `/_admin.*`: Admin routes
 - `/_user.*`: User routes
 - `/_page.*`: Public page routes
+- `/_site.*`: Frontend site routes
 
 ### Components
 
