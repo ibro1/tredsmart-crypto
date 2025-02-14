@@ -4,8 +4,6 @@ import { flatRoutes } from 'remix-flat-routes';
 export default {
   tailwind: true,
   postcss: true,
-  serverMinify: false,
-  serverSourceMaps: false,
 
   ignoredRouteFiles: ["**/.*"],
   routes: async (defineRoutes) => {
