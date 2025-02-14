@@ -1,1 +1,11 @@
-app/routes/_app+/_auth+ app/routes/_auth.auth.tsx app/routes/_auth.login.tsx app/routes/_auth.logout.tsx app/routes/_auth.signup.tsx app/routes/_auth.tsx
+import { Outlet } from "@remix-run/react"
+
+import { AppLayout } from "~/components/layout/app-layout"
+
+export default function AppLayoutRoute() {
+  return (
+    <AppLayout>
+      <Outlet />
+    </AppLayout>
+  )
+}
