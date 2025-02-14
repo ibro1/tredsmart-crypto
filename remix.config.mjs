@@ -45,6 +45,5 @@ export default {
     "@phosphor-icons/react",
     "@icons-pack/react-simple-icons",
     "@remixicon/react",
-    "zod"
   ],
 }
