@@ -1,5 +1,3 @@
-import { flatRoutes } from 'remix-flat-routes';
-
 /** @type {import('@remix-run/dev').AppConfig} */
 export default {
   tailwind: true,
@@ -11,33 +9,9 @@ export default {
   // publicPath: "/build/",
   // serverBuildPath: "build/index.js",
 
-  routes: async (defineRoutes) => {
-    return flatRoutes('routes', defineRoutes);
-  },
-
   browserNodeBuiltinsPolyfill: {
     modules: {
-      // Core modules
       punycode: true,
-      http: true,
-      https: true,
-      url: true,
-      buffer: true,
-      stream: true,
-      crypto: true,
-      
-      // Additional required modules
-      string_decoder: true,
-      assert: true,
-      zlib: true,
-      util: true,
-      events: true,
-      
-      // Common dependencies
-      os: true,
-      path: true,
-      fs: true,
-      vm: true,
     },
   },
 
