@@ -19,8 +19,6 @@ import { getThemeSession } from "~/services/theme.server"
 import { parsedEnvClient } from "~/utils/env.server"
 import { createMeta } from "~/utils/meta"
 import { createSitemap } from "~/utils/sitemap"
-import { SolanaProvider } from "~/lib/solana/context"
-// import { startTweetTracking } from "~/jobs/tweet-tracker.server"
 
 export const handle = createSitemap()
 
@@ -45,12 +43,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       userData: null,
     })
   }
-//  // Start tweet tracking job
-//  if (parsedEnv.NODE_ENV === "production") {
-//   startTweetTracking().catch((error) => {
-//     console.error("Failed to start tweet tracking:", error)
-//   })
-// }
+
   const userData = await modelUser.getForSession({ id: userSession.id })
   if (!userData) return redirect(`/logout`)
 
@@ -68,9 +61,7 @@ function RootRoute() {
   return (
     <ThemeProvider specifiedTheme={data.theme}>
       <Document dataTheme={data.theme}>
-      <SolanaProvider>
-          <Outlet />
-        </SolanaProvider>
+        <Outlet />
       </Document>
     </ThemeProvider>
   )
