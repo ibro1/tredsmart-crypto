@@ -87,7 +87,7 @@ import {
   UsersFour,
   X as XIcon,
 } from "@phosphor-icons/react"
-import { RiBold, RiItalic, RiLink, RiLinkUnlink, RiStrikethrough } from "@remixicon/react"
+import * as RemixIcon from "@remixicon/react"
 import { match } from "ts-pattern"
 
 import { createSlug } from "~/utils/string"
@@ -143,11 +143,11 @@ export const IconMatch = ({ icon, ...props }: { icon: string; className?: string
     .with("dots-six-vertical", () => <DotsSixVertical {...props} />)
     .with("dots-three", () => <DotsThree {...props} />)
     .with("draft", () => <Notebook weight="fill" {...props} />)
-    .with("editor-bold", () => <RiBold {...props} />)
-    .with("editor-italic", () => <RiItalic {...props} />)
-    .with("editor-link-unlink", () => <RiLinkUnlink {...props} />)
-    .with("editor-link", () => <RiLink {...props} />)
-    .with("editor-strikethrough", () => <RiStrikethrough {...props} />)
+    .with("editor-bold", () => <RemixIcon.RiBold {...props} />)
+    .with("editor-italic", () => <RemixIcon.RiItalic {...props} />)
+    .with("editor-link-unlink", () => <RemixIcon.RiLinkUnlink {...props} />)
+    .with("editor-link", () => <RemixIcon.RiLink {...props} />)
+    .with("editor-strikethrough", () => <RemixIcon.RiStrikethrough {...props} />)
     .with("eye-slash", () => <EyeSlash {...props} />)
     .with("eye", () => <Eye {...props} />)
     .with("facebook", () => <SiFacebook {...props} />)
