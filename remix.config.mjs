@@ -44,5 +44,9 @@ export default {
     // Essential utilities
     "bs58",
     "tweetnacl",
+    "superstruct",
+    "@noble/hashes",
+    "@noble/curves",
+    "@solana/buffer-layout",
   ],
 }
