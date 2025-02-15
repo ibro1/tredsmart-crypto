@@ -5,9 +5,9 @@ import { Input } from "~/components/ui/input"
 import { IconArrowLeft, IconDownload, IconEye, IconEyeOff, IconCopy, IconCheck } from "@tabler/icons-react"
 import { Keypair } from "@solana/web3.js"
 import { useFetcher } from "@remix-run/react"
-import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from '@scure/bip39'
+import * as bip39 from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english'
-import { derivePath } from 'ed25519-hd-key'
+import { sha512 } from '@noble/hashes/sha512'
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<"generate" | "backup" | "verify">("generate")
@@ -27,18 +27,16 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleGenerateWallet = useCallback(async () => {
     try {
-      // Generate BIP39 mnemonic phrase
-      const newMnemonic = generateMnemonic(wordlist)
+      // Generate wallet with 24 words (256 bits)
+      const newMnemonic = bip39.generateMnemonic(wordlist, 256)
       setMnemonic(newMnemonic)
 
-      // Convert mnemonic to seed bytes
-      const seed = mnemonicToSeedSync(newMnemonic)
-
-      // Derive Solana keypair using standard derivation path
-      const derivationPath = "m/44'/501'/0'/0'"
-      const derivedSeed = derivePath(derivationPath, seed).key
-      const keypair = Keypair.fromSeed(derivedSeed.slice(0, 32))
-
+      // Convert mnemonic to seed
+      const seed = await bip39.mnemonicToSeed(newMnemonic)
+      
+      // Create keypair from first 32 bytes of seed
+      const keypair = Keypair.fromSeed(seed.slice(0, 32))
+      
       setCurrentKeypair(keypair)
       setStep("backup")
       setError("")
@@ -82,10 +80,8 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleVerify = useCallback(async () => {
     try {
-      // Validate mnemonic first
-      if (!validateMnemonic(mnemonic, wordlist) || !currentKeypair) {
-        setError("Invalid wallet setup. Please regenerate.")
-        return
+      if (!currentKeypair) {
+        throw new Error("Wallet not properly generated")
       }
 
       const words = mnemonic.split(" ")
@@ -96,7 +92,6 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
         throw new Error("Incorrect word")
       }
 
-      // Submit to server with proper keypair
       fetcher.submit(
         { 
           publicKey: currentKeypair.publicKey.toBase58(),
@@ -104,7 +99,6 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
         },
         { method: "post", action: "/auth/wallet" }
       )
-
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed")
       setVerifyWord(prev => ({ ...prev, word: "" }))
