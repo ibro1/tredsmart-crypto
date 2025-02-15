@@ -10,25 +10,26 @@ export default {
     return flatRoutes('routes', defineRoutes);
   },
 
+  // Modern browser polyfill configuration
   browserNodeBuiltinsPolyfill: {
     modules: {
-      // Core Node.js modules needed for Solana
       buffer: true,
       crypto: true,
       stream: true,
       events: true,
       util: true,
       assert: true,
-      
-      // Additional required polyfills
       http: true,
       https: true,
       zlib: true,
       url: true,
       string_decoder: true,
+      os: true, // Added for Solana dependencies
+      path: true // Needed for some crypto modules
     },
   },
 
+  // Critical server-side bundling configuration
   serverDependenciesToBundle: [
     // UI dependencies
     "@phosphor-icons/react",
@@ -40,13 +41,31 @@ export default {
     "@solana/wallet-adapter-base",
     "@solana/wallet-adapter-react",
     "@solana/wallet-adapter-react-ui",
+    "@solana/buffer-layout",
     
-    // Essential utilities
+    // Cryptography dependencies
     "bs58",
     "tweetnacl",
     "superstruct",
+    "jayson",
     "@noble/hashes",
     "@noble/curves",
-    "@solana/buffer-layout",
+    "@noble/curves/ed25519",
+    "@scure/bip39",
+    "ed25519-hd-key",
+    
+    // Additional required polyfills
+    "buffer-from",
+    "process",
+    "stream-browserify",
+    "path-browserify"
   ],
+
+  // Modern ES module compatibility
+  serverModuleFormat: "esm",
+  future: {
+    v3_fetcherPersist: true,
+    v3_relativeSplatPath: true,
+    v3_throwAbortReason: true
+  }
 }
