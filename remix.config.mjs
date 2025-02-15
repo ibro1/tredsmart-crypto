@@ -39,6 +39,9 @@ export default {
     /^@noble\/.*/,
     /^@scure\/.*/,
     'ed25519-hd-key',
+
+    'bn.js',
+    /^bn\.js/,
     // Core Web3 dependencies
     "@solana/web3.js",
     "@solana/wallet-adapter-base",
@@ -65,7 +68,7 @@ export default {
   ],
   serverMainFields: ['module', 'main'],
   serverConditions: ['worker', 'browser', 'development'],
-  
+
   // Modern ES module compatibility
   serverModuleFormat: "esm",
   future: {
