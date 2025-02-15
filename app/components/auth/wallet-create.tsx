@@ -27,6 +27,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
       setStep("backup")
       setError("")
     } catch (err) {
+      console.log(err)
       setError("Failed to generate wallet. Please try again.")
     }
   }, [])
