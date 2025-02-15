@@ -5,7 +5,9 @@ import { Input } from "~/components/ui/input"
 import { IconArrowLeft, IconDownload, IconEye, IconEyeOff, IconCopy, IconCheck } from "@tabler/icons-react"
 import { Keypair } from "@solana/web3.js"
 import { useFetcher } from "@remix-run/react"
-import bs58 from "bs58"
+import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from '@scure/bip39'
+import { wordlist } from '@scure/bip39/wordlists/english'
+import { derivePath } from 'ed25519-hd-key'
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<"generate" | "backup" | "verify">("generate")
@@ -14,35 +16,34 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [verifyWord, setVerifyWord] = useState({ index: -1, word: "" })
   const [error, setError] = useState("")
   const [hasCopied, setHasCopied] = useState(false)
-  const [keypairBackup, setKeypairBackup] = useState<Keypair | null>(null)
   const [currentKeypair, setCurrentKeypair] = useState<Keypair | null>(null)
   const fetcher = useFetcher()
 
-  useEffect(() => {
-    return () => {
-      setMnemonic("")
-      setShowPhrase(false)
-    }
+  // Clear sensitive data on unmount
+  useEffect(() => () => {
+    setMnemonic("")
+    setShowPhrase(false)
   }, [])
 
   const handleGenerateWallet = useCallback(async () => {
     try {
-      // Generate new keypair
-      const keypair = Keypair.generate()
+      // Generate BIP39 mnemonic phrase
+      const newMnemonic = generateMnemonic(wordlist)
+      setMnemonic(newMnemonic)
+
+      // Convert mnemonic to seed bytes
+      const seed = mnemonicToSeedSync(newMnemonic)
+
+      // Derive Solana keypair using standard derivation path
+      const derivationPath = "m/44'/501'/0'/0'"
+      const derivedSeed = derivePath(derivationPath, seed).key
+      const keypair = Keypair.fromSeed(derivedSeed.slice(0, 32))
+
       setCurrentKeypair(keypair)
-      
-      // Convert secret key to words without using Buffer
-      const secretKey = Array.from(keypair.secretKey)
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('')
-        .match(/.{1,4}/g) || []
-      
-      const formattedWords = secretKey.map((word, i) => `word${i + 1}-${word}`)
-      setMnemonic(formattedWords.join(' '))
       setStep("backup")
       setError("")
     } catch (err) {
-      console.error(err)
+      console.error("Wallet generation error:", err)
       setError("Failed to generate wallet. Please try again.")
     }
   }, [])
@@ -56,7 +57,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
       document.body.appendChild(element)
       element.click()
       document.body.removeChild(element)
-      URL.revokeObjectURL(element.href)
+      setTimeout(() => URL.revokeObjectURL(element.href), 1000)
     } catch (err) {
       setError("Failed to download backup. Please try again.")
     }
@@ -66,9 +67,9 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     try {
       await navigator.clipboard.writeText(mnemonic)
       setHasCopied(true)
-      setTimeout(() => setHasCopied(false), 2000) // Reset after 2 seconds
+      setTimeout(() => setHasCopied(false), 2000)
     } catch (err) {
-      setError("Failed to copy phrase. Please try manually.")
+      setError("Failed to copy phrase. Please manually select and copy.")
     }
   }, [mnemonic])
 
@@ -80,41 +81,40 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   }, [mnemonic])
 
   const handleVerify = useCallback(async () => {
-    if (!currentKeypair) {
-      setError("Wallet generation error. Please try again.")
-      return
-    }
-
-    const words = mnemonic.split(" ")
-    const inputWord = verifyWord.word.trim().toLowerCase()
-    const correctWord = words[verifyWord.index]?.toLowerCase()
-
-    if (inputWord === correctWord) {
-      try {
-        fetcher.submit(
-          { 
-            publicKey: currentKeypair.publicKey.toBase58(),
-            action: "create" 
-          },
-          { method: "post", action: "/auth/wallet" }
-        )
-      } catch (err) {
-        setError("Failed to create wallet. Please try again.")
+    try {
+      // Validate mnemonic first
+      if (!validateMnemonic(mnemonic, wordlist) || !currentKeypair) {
+        setError("Invalid wallet setup. Please regenerate.")
+        return
       }
-    } else {
-      setError("Incorrect word. Please try again.")
+
+      const words = mnemonic.split(" ")
+      const inputWord = verifyWord.word.trim().toLowerCase()
+      const correctWord = words[verifyWord.index]?.toLowerCase()
+
+      if (inputWord !== correctWord) {
+        throw new Error("Incorrect word")
+      }
+
+      // Submit to server with proper keypair
+      fetcher.submit(
+        { 
+          publicKey: currentKeypair.publicKey.toBase58(),
+          action: "create" 
+        },
+        { method: "post", action: "/auth/wallet" }
+      )
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed")
+      setVerifyWord(prev => ({ ...prev, word: "" }))
     }
   }, [mnemonic, verifyWord, currentKeypair, fetcher])
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
-      
-<Card className="p-6">
-        <Button
-          variant="ghost"
-          className="mb-4"
-          onClick={onBack}
-        >
+      <Card className="p-6">
+        <Button variant="ghost" className="mb-4" onClick={onBack}>
           <IconArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -130,13 +130,12 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
             <div className="text-center">
               <h1 className="text-2xl font-bold">Create New Wallet</h1>
               <p className="mt-2 text-muted-foreground">
-                Generate a new Solana wallet and secure backup phrase
+                Generate a secure Solana wallet with BIP39 recovery phrase
               </p>
             </div>
-
             <div className="mt-8 flex justify-center">
               <Button onClick={handleGenerateWallet}>
-                Generate New Wallet
+                Generate Secure Wallet
               </Button>
             </div>
           </>
@@ -145,9 +144,9 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
         {step === "backup" && mnemonic && (
           <>
             <div className="text-center">
-              <h1 className="text-2xl font-bold">Backup Your Wallet</h1>
+              <h1 className="text-2xl font-bold">Backup Recovery Phrase</h1>
               <p className="mt-2 text-muted-foreground">
-                Save these 24 words in a secure location. Never share them with anyone.
+                Write down these 24 words in order. This is your master key.
               </p>
             </div>
 
@@ -158,13 +157,20 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
                     <div className="grid grid-cols-3 gap-2">
                       {mnemonic.split(" ").map((word, i) => (
                         <div key={i} className="text-xs">
-                          <span className="text-muted-foreground">{i + 1}.</span>{" "}
+                          <span className="text-muted-foreground">{i + 1}.</span>
                           {word}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    "••••• ••••• ••••• •••••"
+                    <div className="grid grid-cols-3 gap-2">
+                      {Array.from({ length: 24 }).map((_, i) => (
+                        <div key={i} className="text-xs">
+                          <span className="text-muted-foreground">{i + 1}.</span>
+                          ••••••
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div className="absolute right-2 top-2 flex gap-2">
@@ -201,13 +207,10 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
                   onClick={handleDownload}
                 >
                   <IconDownload className="mr-2 h-4 w-4" />
-                  Download Backup
+                  Export Secure File
                 </Button>
-                <Button
-                  className="flex-1"
-                  onClick={startVerification}
-                >
-                  Continue
+                <Button className="flex-1" onClick={startVerification}>
+                  Verify Backup
                 </Button>
               </div>
             </div>
@@ -217,7 +220,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
         {step === "verify" && (
           <>
             <div className="text-center">
-              <h1 className="text-2xl font-bold">Verify Your Backup</h1>
+              <h1 className="text-2xl font-bold">Verify Recovery Phrase</h1>
               <p className="mt-2 text-muted-foreground">
                 Enter word #{verifyWord.index + 1} from your backup phrase
               </p>
@@ -225,19 +228,22 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
             <div className="mt-8 space-y-4">
               <Input
-                type="text"      
+                type="text"
                 value={verifyWord.word}
-                onChange={(e) => setVerifyWord(prev => ({ ...prev, word: e.target.value }))}
-                placeholder="Enter the word"
+                onChange={(e) => setVerifyWord(prev => ({
+                  ...prev,
+                  word: e.target.value
+                }))}
+                placeholder={`Word #${verifyWord.index + 1}`}
                 autoComplete="off"
-                autoCapitalize="off"
+                autoCapitalize="none"
               />
               <Button
                 className="w-full"
                 onClick={handleVerify}
                 disabled={!verifyWord.word.trim()}
               >
-                Verify & Create Wallet
+                Confirm & Activate Wallet
               </Button>
             </div>
           </>
