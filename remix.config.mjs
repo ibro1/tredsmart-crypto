@@ -28,6 +28,9 @@ export default {
       // Optional but recommended for better compatibility
       assert: true,
       url: true,
+
+      // Add bigint support
+      'bigint-buffer': true,
     },
   },
 
@@ -41,5 +44,6 @@ export default {
     "@solana/web3.js",
     "@solana/wallet-adapter-base",
     "bs58",
+    "bigint-buffer",
   ],
 }
