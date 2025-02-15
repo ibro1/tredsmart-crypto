@@ -75,13 +75,7 @@ export default function LoginPage() {
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
       <Card className="p-6">
-        {mode === "select" ? (
-          <SelectMode onModeChange={handleModeChange} />
-        ) : mode === "connect" ? (
-          <WalletLogin onBack={handleBack} />
-        ) : (
-          <WalletCreate onBack={handleBack} />
-        )}
+     
       </Card>
     </div>
   )
