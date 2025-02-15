@@ -27,11 +27,11 @@ export default function LoginPage() {
   const { connected } = useWallet()
   const navigate = useNavigate()
 
-  // useEffect(() => {
-  //   if (connected) {
-  //     navigate("/dashboard")
-  //   }
-  // }, [connected, navigate])
+  useEffect(() => {
+    if (connected) {
+      navigate("/dashboard")
+    }
+  }, [connected, navigate])
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
