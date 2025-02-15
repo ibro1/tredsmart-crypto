@@ -1,225 +1,100 @@
-import { conform, useForm } from "@conform-to/react"
-import { getFieldsetConstraint, parse } from "@conform-to/zod"
-import { json, type ActionFunctionArgs, type MetaFunction } from "@remix-run/node"
-import { Form, useActionData, useNavigation, useSearchParams } from "@remix-run/react"
-import { z } from "zod"
-
-import { IconMatch } from "~/components/libs/icon"
-import { AuthButtons } from "~/components/shared/auth-buttons"
-import { SectionOr } from "~/components/shared/section-or"
-import { ButtonLoading } from "~/components/ui/button-loading"
-import { FormDescription, FormErrors, FormField, FormLabel } from "~/components/ui/form"
-import { Input } from "~/components/ui/input"
-import { InputPassword } from "~/components/ui/input-password"
-import { LinkText } from "~/components/ui/link-text"
-import { configUnallowedKeywords } from "~/configs/unallowed-keywords"
-import { useAppMode } from "~/hooks/use-app-mode"
-import { db } from "~/libs/db.server"
-import { modelUser } from "~/models/user.server"
-import { issueUsernameUnallowed, schemaUserSignUp } from "~/schemas/user"
+import { json, redirect, type LoaderFunctionArgs, type MetaFunction } from "@remix-run/node"
+import { useState } from "react"
+import { Button } from "~/components/ui/button"
+import { IconWallet, IconPlus } from "@tabler/icons-react"
 import { authService } from "~/services/auth.server"
 import { createMeta } from "~/utils/meta"
-import { createTimer } from "~/utils/timer"
+import WalletCreate from "~/components/auth/wallet-create"
+import WalletLogin from "~/components/auth/wallet-login"
 
 export const meta: MetaFunction = () =>
   createMeta({
-    title: `Sign Up`,
-    description: `Create a new account`,
+    title: "Sign Up - TredSmart",
+    description: "Create or connect your Solana wallet to start trading",
   })
 
-export const loader = ({ request }: ActionFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   return authService.isAuthenticated(request, {
-    successRedirect: "/user/dashboard",
+    successRedirect: "/dashboard",
   })
 }
 
-export default function SignUpRoute() {
-  const actionData = useActionData<typeof action>()
-  const { isModeDevelopment } = useAppMode()
+type SignupMode = "select" | "create" | "connect"
 
-  const navigation = useNavigation()
-  const isSubmitting = navigation.state === "submitting"
-
-  const [searchParams] = useSearchParams()
-  const redirectTo = searchParams.get("redirectTo")
-
-  const [form, { email, fullname, username, password }] = useForm<z.infer<typeof schemaUserSignUp>>(
-    {
-      id: "signup",
-      lastSubmission: actionData?.submission,
-      shouldRevalidate: "onInput",
-      constraint: getFieldsetConstraint(schemaUserSignUp),
-      onValidate({ formData }) {
-        return parse(formData, { schema: schemaUserSignUp })
-      },
-      defaultValue: isModeDevelopment
-        ? {
-            email: "example@example.com",
-            fullname: "Example Name",
-            username: "example",
-            password: "exampleexample",
-          }
-        : {},
-    },
-  )
+export default function SignupPage() {
+  const [mode, setMode] = useState<SignupMode>("select")
 
   return (
-    <div className="site-container">
-      <div className="site-section-md space-y-8">
-        <header className="site-header">
-          <h2 className="inline-flex items-center gap-2">
-            <IconMatch icon="user-plus" />
-            <span>Create a new account</span>
-          </h2>
-          <p>
-            Already have an account?{" "}
-            <LinkText to="/login" className="transition hover:text-primary">
-              Log in
-            </LinkText>
-          </p>
-        </header>
+    <div className="container mx-auto max-w-lg px-4 py-12">
+      <div className="rounded-lg bg-background p-6 shadow-sm">
+        {mode === "select" ? (
+          <>
+            <div className="text-center">
+              <h1 className="text-2xl font-bold">Get Started with TredSmart</h1>
+              <p className="mt-2 text-muted-foreground">
+                Choose how you want to start trading on TredSmart
+              </p>
+            </div>
 
-        <section className="space-y-2">
-          <AuthButtons />
-        </section>
+            <div className="mt-8 grid gap-4">
+              <div className="rounded-lg border p-4">
+                <h2 className="text-lg font-semibold">New to Solana?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Create a new wallet to start your crypto journey
+                </p>
+                <Button
+                  className="mt-4 w-full"
+                  onClick={() => setMode("create")}
+                >
+                  <IconPlus className="mr-2 h-5 w-5" />
+                  Create New Wallet
+                </Button>
+              </div>
 
-        <SectionOr />
+              <div className="rounded-lg border p-4">
+                <h2 className="text-lg font-semibold">Already have a wallet?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Connect your existing Solana wallet
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-4 w-full"
+                  onClick={() => setMode("connect")}
+                >
+                  <IconWallet className="mr-2 h-5 w-5" />
+                  Connect Existing Wallet
+                </Button>
+              </div>
+            </div>
 
-        <section>
-          <Form
-            replace
-            action="/signup"
-            method="POST"
-            className="flex flex-col gap-2"
-            {...form.props}
-          >
-            <fieldset className="flex flex-col gap-2" disabled={isSubmitting}>
-              <FormField>
-                <FormLabel htmlFor={fullname.id}>Full Name</FormLabel>
-                <Input
-                  {...conform.input(fullname)}
-                  id={fullname.id}
-                  placeholder="Full Name"
-                  autoFocus={fullname.error ? true : undefined}
-                  required
-                />
-                <FormErrors>{fullname}</FormErrors>
-              </FormField>
+            <p className="mt-8 text-center text-sm text-muted-foreground">
+              By continuing, you agree to our{" "}
+              <a href="/terms" className="underline hover:text-foreground">
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a href="/privacy" className="underline hover:text-foreground">
+                Privacy Policy
+              </a>
+            </p>
+          </>
+        ) : mode === "create" ? (
+          <WalletCreate onBack={() => setMode("select")} />
+        ) : (
+          <WalletLogin onBack={() => setMode("select")} />
+        )}
+      </div>
 
-              <FormField>
-                <FormLabel htmlFor={email.id}>Email</FormLabel>
-                <Input
-                  {...conform.input(email, {
-                    type: "email",
-                    description: true,
-                  })}
-                  id={email.id}
-                  placeholder="yourname@example.com"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  autoFocus={email.error ? true : undefined}
-                  required
-                />
-                <FormErrors>{email}</FormErrors>
-              </FormField>
-
-              <FormField>
-                <FormLabel htmlFor={username.id}>Username</FormLabel>
-                <Input
-                  {...conform.input(username)}
-                  id={username.id}
-                  placeholder="username"
-                  autoFocus={username.error ? true : undefined}
-                  required
-                />
-                <FormDescription id={password.descriptionId}>
-                  4 to 20 characters (letters, numbers, dot, underscore)
-                </FormDescription>
-                <FormErrors>{username}</FormErrors>
-              </FormField>
-
-              <FormField>
-                <FormLabel htmlFor={password.id}>Password</FormLabel>
-                <InputPassword
-                  {...conform.input(password, {
-                    description: true,
-                  })}
-                  id={password.id}
-                  placeholder="Enter password (at least 8 characters)"
-                  autoComplete="current-password"
-                  autoFocus={password.error ? true : undefined}
-                  required
-                  className="w-full"
-                />
-                <FormDescription id={password.descriptionId}>8 characters or more</FormDescription>
-                <FormErrors>{password}</FormErrors>
-              </FormField>
-
-              {redirectTo ? <input type="hidden" name="redirectTo" value={redirectTo} /> : null}
-
-              <ButtonLoading type="submit" loadingText="Signing Up..." isLoading={isSubmitting}>
-                Sign Up
-              </ButtonLoading>
-            </fieldset>
-          </Form>
-        </section>
+      {/* Security Notice */}
+      <div className="mt-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-900/50 dark:bg-yellow-900/20 dark:text-yellow-200">
+        <p className="font-medium">Important Security Information:</p>
+        <ul className="mt-2 list-disc space-y-1 pl-4">
+          <li>Never share your wallet's seed phrase or private keys</li>
+          <li>Always verify you're on tredsmart.com before connecting</li>
+          <li>We never store your private keys or seed phrases</li>
+          <li>Back up your wallet information in a secure location</li>
+        </ul>
       </div>
     </div>
   )
-}
-
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const timer = createTimer()
-  const clonedRequest = request.clone()
-  const formData = await clonedRequest.formData()
-
-  const submission = await parse(formData, {
-    async: true,
-    schema: schemaUserSignUp.superRefine(async (data, ctx) => {
-      const unallowedUsername = configUnallowedKeywords.find(keyword => keyword === data.username)
-      if (unallowedUsername) {
-        ctx.addIssue(issueUsernameUnallowed)
-        return
-      }
-
-      const existingEmail = await db.user.findUnique({
-        where: { email: data.email },
-        select: { id: true },
-      })
-      if (existingEmail) {
-        ctx.addIssue({
-          path: ["email"],
-          code: z.ZodIssueCode.custom,
-          message: "Email cannot be used",
-        })
-        return
-      }
-
-      const existingUsername = await db.user.findUnique({
-        where: { username: data.username },
-        select: { id: true },
-      })
-      if (existingUsername) {
-        ctx.addIssue(issueUsernameUnallowed)
-        return
-      }
-    }),
-  })
-
-  if (!submission.value || submission.intent !== "submit") {
-    await timer.delay()
-    return json({ status: "error", submission }, { status: 400 })
-  }
-
-  const newUser = await modelUser.signup(submission.value)
-
-  if (!newUser) {
-    await timer.delay()
-    return json({ status: "error", submission }, { status: 500 })
-  }
-
-  await timer.delay()
-  return authService.authenticate("form", request, {
-    successRedirect: "/user/dashboard",
-  })
 }
