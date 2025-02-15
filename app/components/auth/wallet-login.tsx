@@ -4,6 +4,7 @@ import { useState, useCallback } from "react"
 import { useFetcher } from "@remix-run/react"
 import { Button } from "~/components/ui/button"
 import { IconArrowLeft } from "@tabler/icons-react"
+import bs58 from "bs58"
 
 export default function WalletLogin({ onBack }: { onBack: () => void }) {
   const { publicKey, signMessage, connected } = useWallet()
@@ -25,7 +26,7 @@ export default function WalletLogin({ onBack }: { onBack: () => void }) {
       fetcher.submit(
         {
           message,
-          signature: Buffer.from(signature).toString("base58"),
+          signature: bs58.encode(signature),
           publicKey: publicKey.toBase58(),
         },
         { method: "post", action: "/auth/wallet" }
