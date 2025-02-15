@@ -49,10 +49,8 @@ export default {
     "bigint-buffer",
     "superstruct",
     "rpc-websockets",
-    // Include specific jayson modules
-    "jayson/lib/client/browser",
-    "jayson/lib/client/browser/index.js",
-    "jayson/lib/utils",
+    // Bundle the entire jayson package instead of specific paths
+    "jayson",
     "bn.js",
     "borsh",
   ],
