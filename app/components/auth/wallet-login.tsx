@@ -1,28 +1,22 @@
 import { useWallet } from "@solana/wallet-adapter-react"
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
-import { useState, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { useFetcher } from "@remix-run/react"
-import { Card } from "~/components/ui/card"
 import { Button } from "~/components/ui/button"
 import { IconArrowLeft } from "@tabler/icons-react"
 import bs58 from "bs58"
 
-// Change from named export to default export
 export default function WalletLogin({ onBack }: { onBack: () => void }) {
   const { publicKey, signMessage, connected } = useWallet()
   const fetcher = useFetcher()
   const [error, setError] = useState<string>()
+  const [isSigningIn, setIsSigningIn] = useState(false)
 
-  // Debounce the auto-login effect
-  useEffect(() => {
-    if (!connected || !publicKey || !signMessage) return
+  const handleLogin = useCallback(async () => {
+    if (!publicKey || !signMessage || isSigningIn) return
 
-    const timeoutId = setTimeout(handleLogin, 500)
-    return () => clearTimeout(timeoutId)
-  }, [connected, publicKey, signMessage])
-
-  async function handleLogin() {
-    if (!publicKey || !signMessage) return
+    setIsSigningIn(true)
+    setError(undefined)
 
     try {
       const message = `Sign in to TredSmart\nNonce: ${Date.now()}`
@@ -41,36 +35,42 @@ export default function WalletLogin({ onBack }: { onBack: () => void }) {
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign message")
+    } finally {
+      setIsSigningIn(false)
     }
+  }, [publicKey, signMessage, fetcher, isSigningIn])
+
+  // Auto-sign when wallet is connected
+  if (connected && !isSigningIn && !error) {
+    handleLogin()
   }
 
   return (
-    <div className="container mx-auto max-w-lg px-4 py-12">
-      <Card className="p-6">
-        <Button
-          variant="ghost"
-          className="mb-4"
-          onClick={onBack}
-        >
-          <IconArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
+    <>
+      <Button
+        variant="ghost"
+        className="mb-4"
+        onClick={onBack}
+        disabled={isSigningIn}
+      >
+        <IconArrowLeft className="mr-2 h-4 w-4" />
+        Back
+      </Button>
 
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Connect Wallet</h1>
-          <p className="mt-2 text-muted-foreground">
-            Connect your wallet to continue
-          </p>
-        </div>
+      <div className="text-center">
+        <h1 className="text-2xl font-bold">Connect Wallet</h1>
+        <p className="mt-2 text-muted-foreground">
+          {isSigningIn ? "Signing in..." : "Connect your wallet to continue"}
+        </p>
+      </div>
 
-        <div className="mt-8 flex justify-center">
-          <WalletMultiButton />
-        </div>
+      <div className="mt-8 flex justify-center">
+        <WalletMultiButton disabled={isSigningIn} />
+      </div>
 
-        {error && (
-          <p className="mt-4 text-center text-sm text-destructive">{error}</p>
-        )}
-      </Card>
-    </div>
+      {error && (
+        <p className="mt-4 text-center text-sm text-destructive">{error}</p>
+      )}
+    </>
   )
 }
