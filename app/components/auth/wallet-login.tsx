@@ -4,15 +4,14 @@ import { useState, useCallback } from "react"
 import { useFetcher } from "@remix-run/react"
 import { Button } from "~/components/ui/button"
 import { IconArrowLeft } from "@tabler/icons-react"
-import bs58 from "bs58"
 
 export default function WalletLogin({ onBack }: { onBack: () => void }) {
   const { publicKey, signMessage, connected } = useWallet()
   const fetcher = useFetcher()
-  const [error, setError] = useState<string>()
   const [isSigningIn, setIsSigningIn] = useState(false)
+  const [error, setError] = useState<string>()
 
-  const handleLogin = useCallback(async () => {
+  const handleSignMessage = useCallback(async () => {
     if (!publicKey || !signMessage || isSigningIn) return
 
     setIsSigningIn(true)
@@ -22,14 +21,12 @@ export default function WalletLogin({ onBack }: { onBack: () => void }) {
       const message = `Sign in to TredSmart\nNonce: ${Date.now()}`
       const encodedMessage = new TextEncoder().encode(message)
       const signature = await signMessage(encodedMessage)
-      const signatureStr = bs58.encode(signature)
 
       fetcher.submit(
         {
           message,
-          signature: signatureStr,
+          signature: Buffer.from(signature).toString("base58"),
           publicKey: publicKey.toBase58(),
-          redirectTo: "/dashboard",
         },
         { method: "post", action: "/auth/wallet" }
       )
@@ -42,7 +39,7 @@ export default function WalletLogin({ onBack }: { onBack: () => void }) {
 
   // Auto-sign when wallet is connected
   if (connected && !isSigningIn && !error) {
-    handleLogin()
+    handleSignMessage()
   }
 
   return (

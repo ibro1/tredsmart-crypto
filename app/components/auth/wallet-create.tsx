@@ -5,6 +5,7 @@ import { Input } from "~/components/ui/input"
 import { IconArrowLeft, IconDownload, IconEye, IconEyeOff } from "@tabler/icons-react"
 import * as bip39 from "bip39"
 import { Keypair } from "@solana/web3.js"
+import { useFetcher } from "@remix-run/react"
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<"generate" | "backup" | "verify">("generate")
@@ -12,6 +13,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [showPhrase, setShowPhrase] = useState(false)
   const [verifyWord, setVerifyWord] = useState({ index: -1, word: "" })
   const [error, setError] = useState("")
+  const fetcher = useFetcher()
 
   useEffect(() => {
     return () => {
@@ -20,7 +22,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     }
   }, [])
 
-  const handleGenerateWallet = useCallback(() => {
+  const handleGenerateWallet = useCallback(async () => {
     try {
       const newMnemonic = bip39.generateMnemonic(256) // Using 24 words for better security
       setMnemonic(newMnemonic)
@@ -54,18 +56,27 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     setStep("verify")
   }, [mnemonic])
 
-  const handleVerify = useCallback(() => {
+  const handleVerify = useCallback(async () => {
     const words = mnemonic.split(" ")
     if (words[verifyWord.index] === verifyWord.word.trim().toLowerCase()) {
-      // Create the wallet
-      const seed = bip39.mnemonicToSeedSync(mnemonic)
-      const keypair = Keypair.fromSeed(seed.slice(0, 32))
-      console.log("Wallet created:", keypair.publicKey.toBase58())
-      // TODO: Handle the new wallet (store it, connect it, etc.)
+      try {
+        const seed = await bip39.mnemonicToSeed(mnemonic)
+        const keypair = Keypair.fromSeed(seed.slice(0, 32))
+        
+        fetcher.submit(
+          { 
+            publicKey: keypair.publicKey.toBase58(),
+            action: "create" 
+          },
+          { method: "post", action: "/auth/wallet" }
+        )
+      } catch (err) {
+        setError("Failed to create wallet. Please try again.")
+      }
     } else {
       setError("Incorrect word. Please try again.")
     }
-  }, [mnemonic, verifyWord])
+  }, [mnemonic, verifyWord, fetcher])
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
