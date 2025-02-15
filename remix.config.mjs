@@ -16,6 +16,9 @@ export default {
       buffer: true,
       crypto: true,
       stream: true,
+      http: true,
+      https: true,
+      zlib: true,
       
       // Required for web3 functionality
       events: true,
