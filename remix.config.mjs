@@ -12,17 +12,15 @@ export default {
 
   browserNodeBuiltinsPolyfill: {
     modules: {
-      buffer: true,
+      // Core Node.js modules needed for Solana
       crypto: true,
       stream: true,
       events: true,
       util: true,
       assert: true,
-      url: true,
     },
   },
 
-  // Simplified dependencies bundling
   serverDependenciesToBundle: [
     // UI dependencies
     "@phosphor-icons/react",
@@ -38,6 +36,5 @@ export default {
     // Essential utilities
     "bs58",
     "tweetnacl",
-    "buffer",
   ],
 }
