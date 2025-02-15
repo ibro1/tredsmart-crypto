@@ -2,9 +2,10 @@ import { useState, useCallback, useEffect } from "react"
 import { Card } from "~/components/ui/card"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
-import { IconArrowLeft, IconDownload, IconEye, IconEyeOff } from "@tabler/icons-react"
+import { IconArrowLeft, IconDownload, IconEye, IconEyeOff, IconCopy, IconCheck } from "@tabler/icons-react"
 import { Keypair } from "@solana/web3.js"
 import { useFetcher } from "@remix-run/react"
+import * as bip39 from "bip39"
 import bs58 from "bs58"
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
@@ -13,6 +14,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [showPhrase, setShowPhrase] = useState(false)
   const [verifyWord, setVerifyWord] = useState({ index: -1, word: "" })
   const [error, setError] = useState("")
+  const [hasCopied, setHasCopied] = useState(false)
   const fetcher = useFetcher()
 
   useEffect(() => {
@@ -24,18 +26,16 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleGenerateWallet = useCallback(async () => {
     try {
-      // Generate a new keypair
-      const keypair = Keypair.generate()
+      // Generate a proper BIP39 mnemonic (24 words)
+      const newMnemonic = bip39.generateMnemonic(256)
+      const seed = await bip39.mnemonicToSeed(newMnemonic)
       
-      // Convert the secret key to a string of words
-      const secretKeyBytes = keypair.secretKey
-      const secretKeyBase58 = bs58.encode(secretKeyBytes)
+      // Create a Solana keypair from the seed
+      const keypair = Keypair.fromSeed(seed.slice(0, 32))
       
-      // Create a deterministic set of words from the base58 string
-      const words = secretKeyBase58.match(/.{1,8}/g) || []
-      const newMnemonic = words.join(' ')
-
+      // Store both mnemonic and keypair info
       setMnemonic(newMnemonic)
+      // Store keypair in state if needed
       setStep("backup")
       setError("")
     } catch (err) {
@@ -59,6 +59,16 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     }
   }, [mnemonic])
 
+  const handleCopyPhrase = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(mnemonic)
+      setHasCopied(true)
+      setTimeout(() => setHasCopied(false), 2000) // Reset after 2 seconds
+    } catch (err) {
+      setError("Failed to copy phrase. Please try manually.")
+    }
+  }, [mnemonic])
+
   const startVerification = useCallback(() => {
     const words = mnemonic.split(" ")
     const randomIndex = Math.floor(Math.random() * words.length)
@@ -70,10 +80,9 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     const words = mnemonic.split(" ")
     if (words[verifyWord.index] === verifyWord.word.trim().toLowerCase()) {
       try {
-        // Convert mnemonic back to keypair
-        const secretKeyBase58 = words.join('')
-        const secretKey = bs58.decode(secretKeyBase58)
-        const keypair = Keypair.fromSecretKey(secretKey)
+        // Convert mnemonic to keypair
+        const seed = await bip39.mnemonicToSeed(mnemonic)
+        const keypair = Keypair.fromSeed(seed.slice(0, 32))
         
         fetcher.submit(
           { 
@@ -137,21 +146,45 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
             <div className="mt-8 space-y-4">
               <div className="relative">
-                <div className="rounded-lg border bg-muted p-4 font-mono text-sm break-all">
-                  {showPhrase ? mnemonic : "••••• ••••• ••••• •••••"}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-2"
-                  onClick={() => setShowPhrase(!showPhrase)}
-                >
+                <div className="rounded-lg border bg-muted p-4 font-mono text-sm">
                   {showPhrase ? (
-                    <IconEyeOff className="h-4 w-4" />
+                    <div className="grid grid-cols-3 gap-2">
+                      {mnemonic.split(" ").map((word, i) => (
+                        <div key={i} className="text-xs">
+                          <span className="text-muted-foreground">{i + 1}.</span>{" "}
+                          {word}
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <IconEye className="h-4 w-4" />
+                    "••••• ••••• ••••• •••••"
                   )}
-                </Button>
+                </div>
+                <div className="absolute right-2 top-2 flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyPhrase}
+                    disabled={!showPhrase}
+                  >
+                    {hasCopied ? (
+                      <IconCheck className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <IconCopy className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPhrase(!showPhrase)}
+                  >
+                    {showPhrase ? (
+                      <IconEyeOff className="h-4 w-4" />
+                    ) : (
+                      <IconEye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
 
               <div className="flex gap-4">
