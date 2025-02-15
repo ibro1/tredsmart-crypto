@@ -21,6 +21,7 @@ import { parsedEnv, parsedEnvClient } from "~/utils/env.server"
 import { createMeta } from "~/utils/meta"
 import { createSitemap } from "~/utils/sitemap"
 import { SolanaProvider } from "~/lib/solana/context"
+import "~/utils/buffer-polyfill"
 // import { startTweetTracking } from "~/jobs/tweet-tracker.server"
 
 export const handle = createSitemap()

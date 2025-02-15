@@ -3,9 +3,9 @@ import { Card } from "~/components/ui/card"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { IconArrowLeft, IconDownload, IconEye, IconEyeOff } from "@tabler/icons-react"
-import * as bip39 from "bip39"
 import { Keypair } from "@solana/web3.js"
 import { useFetcher } from "@remix-run/react"
+import bs58 from "bs58"
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<"generate" | "backup" | "verify">("generate")
@@ -24,12 +24,22 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleGenerateWallet = useCallback(async () => {
     try {
-      const newMnemonic = bip39.generateMnemonic(256) // Using 24 words for better security
+      // Generate a new keypair
+      const keypair = Keypair.generate()
+      
+      // Convert the secret key to a string of words
+      const secretKeyBytes = keypair.secretKey
+      const secretKeyBase58 = bs58.encode(secretKeyBytes)
+      
+      // Create a deterministic set of words from the base58 string
+      const words = secretKeyBase58.match(/.{1,8}/g) || []
+      const newMnemonic = words.join(' ')
+
       setMnemonic(newMnemonic)
       setStep("backup")
       setError("")
     } catch (err) {
-      console.log(err)
+      console.error(err)
       setError("Failed to generate wallet. Please try again.")
     }
   }, [])
@@ -60,8 +70,10 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     const words = mnemonic.split(" ")
     if (words[verifyWord.index] === verifyWord.word.trim().toLowerCase()) {
       try {
-        const seed = await bip39.mnemonicToSeed(mnemonic)
-        const keypair = Keypair.fromSeed(seed.slice(0, 32))
+        // Convert mnemonic back to keypair
+        const secretKeyBase58 = words.join('')
+        const secretKey = bs58.decode(secretKeyBase58)
+        const keypair = Keypair.fromSecretKey(secretKey)
         
         fetcher.submit(
           { 
