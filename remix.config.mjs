@@ -40,10 +40,17 @@ export default {
     "@icons-pack/react-simple-icons",
     "@remixicon/react",
     
-    // Add Solana-related packages that need bundling
+    // Solana and related dependencies
     "@solana/web3.js",
     "@solana/wallet-adapter-base",
+    "@solana/wallet-adapter-react",
+    "@solana/wallet-adapter-react-ui",
     "bs58",
     "bigint-buffer",
+    "superstruct",
+    "rpc-websockets",
+    "jayson",
+    "bn.js",
+    "borsh",
   ],
 }
