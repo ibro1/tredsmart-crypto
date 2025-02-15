@@ -5,7 +5,6 @@ import { Input } from "~/components/ui/input"
 import { IconArrowLeft, IconDownload, IconEye, IconEyeOff, IconCopy, IconCheck } from "@tabler/icons-react"
 import { Keypair } from "@solana/web3.js"
 import { useFetcher } from "@remix-run/react"
-import * as bip39 from "bip39"
 import bs58 from "bs58"
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
@@ -26,16 +25,20 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleGenerateWallet = useCallback(async () => {
     try {
-      // Generate a proper BIP39 mnemonic (24 words)
-      const newMnemonic = bip39.generateMnemonic(256)
-      const seed = await bip39.mnemonicToSeed(newMnemonic)
+      // Generate random bytes for entropy
+      const entropy = new Uint8Array(32)
+      window.crypto.getRandomValues(entropy)
       
-      // Create a Solana keypair from the seed
-      const keypair = Keypair.fromSeed(seed.slice(0, 32))
+      // Create keypair directly
+      const keypair = Keypair.generate()
       
-      // Store both mnemonic and keypair info
+      // Convert secret key to words for backup
+      const secretKeyBase58 = bs58.encode(keypair.secretKey)
+      // Create deterministic words from the base58 string
+      const words = secretKeyBase58.match(/.{1,8}/g) || []
+      const newMnemonic = words.join(' ')
+
       setMnemonic(newMnemonic)
-      // Store keypair in state if needed
       setStep("backup")
       setError("")
     } catch (err) {
@@ -80,9 +83,10 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     const words = mnemonic.split(" ")
     if (words[verifyWord.index] === verifyWord.word.trim().toLowerCase()) {
       try {
-        // Convert mnemonic to keypair
-        const seed = await bip39.mnemonicToSeed(mnemonic)
-        const keypair = Keypair.fromSeed(seed.slice(0, 32))
+        // Convert mnemonic back to keypair
+        const secretKeyBase58 = words.join('')
+        const secretKey = bs58.decode(secretKeyBase58)
+        const keypair = Keypair.fromSecretKey(new Uint8Array(secretKey))
         
         fetcher.submit(
           { 
