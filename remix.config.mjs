@@ -35,7 +35,10 @@ export default {
     "@phosphor-icons/react",
     "@icons-pack/react-simple-icons",
     "@remixicon/react",
-    
+    /^jayson/,
+    /^@noble\/.*/,
+    /^@scure\/.*/,
+    'ed25519-hd-key',
     // Core Web3 dependencies
     "@solana/web3.js",
     "@solana/wallet-adapter-base",
@@ -60,7 +63,9 @@ export default {
     "stream-browserify",
     "path-browserify"
   ],
-
+  serverMainFields: ['module', 'main'],
+  serverConditions: ['worker', 'browser', 'development'],
+  
   // Modern ES module compatibility
   serverModuleFormat: "esm",
   future: {
