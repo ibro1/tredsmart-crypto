@@ -11,7 +11,7 @@ import { githubStrategy } from "~/services/auth-strategies/github.strategy"
 import { googleStrategy } from "~/services/auth-strategies/google.strategy"
 import { convertDaysToSeconds } from "~/utils/datetime"
 import { isProduction, parsedEnv } from "~/utils/env.server"
-import { prisma } from "./db.server"
+import { db } from "~/libs/db.server"
 
 export const authStorage = createCookieSessionStorage({
   cookie: {
@@ -21,42 +21,30 @@ export const authStorage = createCookieSessionStorage({
     sameSite: "lax",
     secrets: [parsedEnv.SESSION_SECRET],
     secure: isProduction,
-    maxAge: convertDaysToSeconds(30), // EDITME: Change session persistence
+    maxAge: convertDaysToSeconds(30),
   },
 })
 
-/**
- * UserSession is stored in the cookie
- */
 export interface UserSession {
   id: string
-  // Add user properties here or extend with a type from the database
+  publicKey?: string
 }
 
-/**
- * UserData is not stored in the cookie, only retrieved when necessary
- */
 export interface UserData
   extends NonNullable<Prisma.PromiseReturnType<typeof modelUser.getForSession>> {}
 
 export type AuthStrategy = (typeof AuthStrategies)[keyof typeof AuthStrategies]
 
-/**
- * authService
- *
- * Create an instance of the authenticator, pass a generic with what
- * strategies will return and will store in the session
- *
- * When using this, might need to have a cloned request
- * const clonedRequest = request.clone()
- */
-export const authService = new Authenticator<UserSession>(authStorage)
+// Create a single authenticator instance
+const authenticator = new Authenticator<UserSession>(authStorage)
 
-authService.use(formStrategy, AuthStrategies.FORM)
-authService.use(githubStrategy, AuthStrategies.GITHUB)
-authService.use(googleStrategy, AuthStrategies.GOOGLE)
+// Add the existing strategies
+authenticator.use(formStrategy, AuthStrategies.FORM)
+authenticator.use(githubStrategy, AuthStrategies.GITHUB)
+authenticator.use(googleStrategy, AuthStrategies.GOOGLE)
 
-authService.use(
+// Add Solana wallet strategy
+authenticator.use(
   {
     name: "solana-wallet",
     async authenticate(request) {
@@ -81,27 +69,28 @@ authService.use(
       }
 
       // Find or create user
-      let user = await prisma.user.findUnique({
+      let user = await db.user.findUnique({
         where: { publicKey },
       })
 
       if (!user) {
-        user = await prisma.user.create({
+        user = await db.user.create({
           data: { publicKey },
         })
       }
 
-      return user
+      return { id: user.id, publicKey: user.publicKey }
     },
   },
   "solana-wallet"
 )
 
-// Helper functions
+// Export the auth service with helper methods
 export const authService = {
   authenticate: authenticator.authenticate.bind(authenticator),
   isAuthenticated: authenticator.isAuthenticated.bind(authenticator),
   logout: authenticator.logout.bind(authenticator),
 }
 
+// Export the authenticator for direct access when needed
 export { authenticator }
