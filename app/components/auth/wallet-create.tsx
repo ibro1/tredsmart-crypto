@@ -15,6 +15,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState("")
   const [hasCopied, setHasCopied] = useState(false)
   const [keypairBackup, setKeypairBackup] = useState<Keypair | null>(null)
+  const [currentKeypair, setCurrentKeypair] = useState<Keypair | null>(null)
   const fetcher = useFetcher()
 
   useEffect(() => {
@@ -28,13 +29,16 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     try {
       // Generate new keypair
       const keypair = Keypair.generate()
-      setKeypairBackup(keypair)
+      setCurrentKeypair(keypair)
       
-      // Convert secret key to formatted string
-      const secretKeyHex = Buffer.from(keypair.secretKey).toString('hex')
-      const formattedWords = secretKeyHex.match(/.{1,4}/g)?.join(' ') || ''
+      // Convert secret key to words without using Buffer
+      const secretKey = Array.from(keypair.secretKey)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('')
+        .match(/.{1,4}/g) || []
       
-      setMnemonic(formattedWords)
+      const formattedWords = secretKey.map((word, i) => `word${i + 1}-${word}`)
+      setMnemonic(formattedWords.join(' '))
       setStep("backup")
       setError("")
     } catch (err) {
@@ -76,15 +80,20 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   }, [mnemonic])
 
   const handleVerify = useCallback(async () => {
+    if (!currentKeypair) {
+      setError("Wallet generation error. Please try again.")
+      return
+    }
+
     const words = mnemonic.split(" ")
     const inputWord = verifyWord.word.trim().toLowerCase()
     const correctWord = words[verifyWord.index]?.toLowerCase()
 
-    if (inputWord === correctWord && keypairBackup) {
+    if (inputWord === correctWord) {
       try {
         fetcher.submit(
           { 
-            publicKey: keypairBackup.publicKey.toBase58(),
+            publicKey: currentKeypair.publicKey.toBase58(),
             action: "create" 
           },
           { method: "post", action: "/auth/wallet" }
@@ -95,7 +104,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     } else {
       setError("Incorrect word. Please try again.")
     }
-  }, [mnemonic, verifyWord, fetcher, keypairBackup])
+  }, [mnemonic, verifyWord, currentKeypair, fetcher])
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
