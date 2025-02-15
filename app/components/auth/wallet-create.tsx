@@ -14,6 +14,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [verifyWord, setVerifyWord] = useState({ index: -1, word: "" })
   const [error, setError] = useState("")
   const [hasCopied, setHasCopied] = useState(false)
+  const [keypairBackup, setKeypairBackup] = useState<Keypair | null>(null)
   const fetcher = useFetcher()
 
   useEffect(() => {
@@ -25,20 +26,15 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleGenerateWallet = useCallback(async () => {
     try {
-      // Generate random bytes for entropy
-      const entropy = new Uint8Array(32)
-      window.crypto.getRandomValues(entropy)
-      
-      // Create keypair directly
+      // Generate new keypair
       const keypair = Keypair.generate()
+      setKeypairBackup(keypair)
       
-      // Convert secret key to words for backup
-      const secretKeyBase58 = bs58.encode(keypair.secretKey)
-      // Create deterministic words from the base58 string
-      const words = secretKeyBase58.match(/.{1,8}/g) || []
-      const newMnemonic = words.join(' ')
-
-      setMnemonic(newMnemonic)
+      // Convert secret key to formatted string
+      const secretKeyHex = Buffer.from(keypair.secretKey).toString('hex')
+      const formattedWords = secretKeyHex.match(/.{1,4}/g)?.join(' ') || ''
+      
+      setMnemonic(formattedWords)
       setStep("backup")
       setError("")
     } catch (err) {
@@ -81,16 +77,14 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleVerify = useCallback(async () => {
     const words = mnemonic.split(" ")
-    if (words[verifyWord.index] === verifyWord.word.trim().toLowerCase()) {
+    const inputWord = verifyWord.word.trim().toLowerCase()
+    const correctWord = words[verifyWord.index]?.toLowerCase()
+
+    if (inputWord === correctWord && keypairBackup) {
       try {
-        // Convert mnemonic back to keypair
-        const secretKeyBase58 = words.join('')
-        const secretKey = bs58.decode(secretKeyBase58)
-        const keypair = Keypair.fromSecretKey(new Uint8Array(secretKey))
-        
         fetcher.submit(
           { 
-            publicKey: keypair.publicKey.toBase58(),
+            publicKey: keypairBackup.publicKey.toBase58(),
             action: "create" 
           },
           { method: "post", action: "/auth/wallet" }
@@ -101,7 +95,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
     } else {
       setError("Incorrect word. Please try again.")
     }
-  }, [mnemonic, verifyWord, fetcher])
+  }, [mnemonic, verifyWord, fetcher, keypairBackup])
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
