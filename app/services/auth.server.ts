@@ -1,7 +1,8 @@
 import { type Prisma } from "@prisma/client"
 import { createCookieSessionStorage } from "@remix-run/node"
 import { Authenticator } from "remix-auth"
-import { verify } from "@solana/web3.js"
+import * as web3 from "@solana/web3.js"
+import { PublicKey } from "@solana/web3.js"
 import bs58 from "bs58"
 
 import { type modelUser } from "~/models/user.server"
@@ -57,29 +58,39 @@ authenticator.use(
         throw new Error("Missing authentication details")
       }
 
-      // Verify signature
-      const isValid = verify(
-        bs58.decode(signature),
-        new TextEncoder().encode(message),
-        bs58.decode(publicKey)
-      )
+      try {
+        // Convert public key string to PublicKey object
+        const pubKey = new PublicKey(publicKey)
+        
+        // Verify signature
+        const messageBytes = new TextEncoder().encode(message)
+        const signatureBytes = bs58.decode(signature)
+        
+        const isValid = web3.nacl.sign.detached.verify(
+          messageBytes,
+          signatureBytes,
+          pubKey.toBytes()
+        )
 
-      if (!isValid) {
-        throw new Error("Invalid signature")
-      }
+        if (!isValid) {
+          throw new Error("Invalid signature")
+        }
 
-      // Find or create user
-      let user = await db.user.findUnique({
-        where: { publicKey },
-      })
-
-      if (!user) {
-        user = await db.user.create({
-          data: { publicKey },
+        // Find or create user
+        let user = await db.user.findUnique({
+          where: { publicKey },
         })
-      }
 
-      return { id: user.id, publicKey: user.publicKey }
+        if (!user) {
+          user = await db.user.create({
+            data: { publicKey },
+          })
+        }
+
+        return { id: user.id, publicKey: user.publicKey }
+      } catch (error) {
+        throw new Error(`Authentication failed: ${error.message}`)
+      }
     },
   },
   "solana-wallet"
