@@ -13,11 +13,19 @@ export default {
   browserNodeBuiltinsPolyfill: {
     modules: {
       // Core Node.js modules needed for Solana
+      buffer: true,
       crypto: true,
       stream: true,
       events: true,
       util: true,
       assert: true,
+      
+      // Additional required polyfills
+      http: true,
+      https: true,
+      zlib: true,
+      url: true,
+      string_decoder: true,
     },
   },
 
