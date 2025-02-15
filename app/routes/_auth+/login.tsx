@@ -61,26 +61,21 @@ export default function LoginPage() {
     }
   }, [connected, navigate])
 
-  // if (connecting || isLoading) {
-  //   return (
-  //     <div className="container mx-auto max-w-lg px-4 py-12">
-  //       <div className="rounded-lg bg-background p-6 shadow-sm">
-  //         <p className="text-center">Connecting wallet...</p>
-  //       </div>
-  //     </div>
-  //   )
-  // }
+  if (connecting || isLoading) {
+    return (
+      <div className="container mx-auto max-w-lg px-4 py-12">
+        <div className="rounded-lg bg-background p-6 shadow-sm">
+          <p className="text-center">Connecting wallet...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
       <div className="rounded-lg bg-background p-6 shadow-sm">
-        {mode === "select" ? (
-          <SelectMode onModeChange={handleModeChange} />
-        ) : mode === "connect" ? (
-          <WalletLogin onBack={handleBack} />
-        ) : (
-          <WalletCreate onBack={handleBack} />
-        )}
+      <WalletLogin onBack={handleBack} />
+
       </div>
     </div>
   )
