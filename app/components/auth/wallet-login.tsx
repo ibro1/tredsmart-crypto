@@ -1,16 +1,23 @@
 import { useWallet } from "@solana/wallet-adapter-react"
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useFetcher } from "@remix-run/react"
 import { Button } from "~/components/ui/button"
 import { IconArrowLeft } from "@tabler/icons-react"
 import bs58 from "bs58"
 
 export default function WalletLogin({ onBack }: { onBack: () => void }) {
-  const { publicKey, signMessage, connected } = useWallet()
+  const { publicKey, signMessage, connected, connecting } = useWallet()
   const fetcher = useFetcher()
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [error, setError] = useState<string>()
+
+  // Clear error when connection state changes
+  useEffect(() => {
+    if (connecting) {
+      setError(undefined)
+    }
+  }, [connecting])
 
   const handleSignMessage = useCallback(async () => {
     if (!publicKey || !signMessage || isSigningIn) return
@@ -32,16 +39,21 @@ export default function WalletLogin({ onBack }: { onBack: () => void }) {
         { method: "post", action: "/auth/wallet" }
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to sign message")
+      // Only show errors that aren't user rejections
+      if (err instanceof Error && !err.message.includes("User rejected")) {
+        setError(err.message)
+      }
     } finally {
       setIsSigningIn(false)
     }
   }, [publicKey, signMessage, fetcher, isSigningIn])
 
-  // Auto-sign when wallet is connected
-  if (connected && !isSigningIn && !error) {
-    handleSignMessage()
-  }
+  // Only attempt auto-sign when explicitly connected
+  useEffect(() => {
+    if (connected && !isSigningIn && !error) {
+      handleSignMessage()
+    }
+  }, [connected, isSigningIn, error, handleSignMessage])
 
   return (
     <>
@@ -63,7 +75,9 @@ export default function WalletLogin({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="mt-8 flex justify-center">
-        <WalletMultiButton disabled={isSigningIn} />
+        <WalletMultiButton 
+          disabled={isSigningIn}
+        />
       </div>
 
       {error && (

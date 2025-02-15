@@ -29,8 +29,15 @@ export function Document({
   // Set up Solana network connection
   const endpoint = useMemo(() => clusterApiUrl("devnet"), []) // or "mainnet-beta" for production
   
-  // Set up supported wallets
-  const wallets = useMemo(() => [new PhantomWalletAdapter()], [])
+  // Set up supported wallets with proper config
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter({
+        network: "devnet",
+      }),
+    ],
+    []
+  )
 
   return (
     <html lang={configSite.languageCode} className={theme ?? ""}>
@@ -44,7 +51,16 @@ export function Document({
 
       <body id="__remix">
         <ConnectionProvider endpoint={endpoint}>
-          <WalletProvider wallets={wallets} autoConnect>
+          <WalletProvider 
+            wallets={wallets} 
+            autoConnect={false}
+            onError={(error) => {
+              // Only log actual errors, not user rejections
+              if (!error.message.includes("User rejected")) {
+                console.error("Wallet error:", error)
+              }
+            }}
+          >
             <WalletModalProvider>
               {children}
             </WalletModalProvider>
