@@ -12,46 +12,32 @@ export default {
 
   browserNodeBuiltinsPolyfill: {
     modules: {
-      // Essential for Solana wallet
       buffer: true,
       crypto: true,
       stream: true,
-      http: true,
-      https: true,
-      zlib: true,
-      
-      // Required for web3 functionality
       events: true,
-      string_decoder: true,
       util: true,
-      
-      // Optional but recommended for better compatibility
       assert: true,
       url: true,
-
-      // Add bigint support
-      'bigint-buffer': true,
     },
   },
 
+  // Simplified dependencies bundling
   serverDependenciesToBundle: [
-    // Existing dependencies
+    // UI dependencies
     "@phosphor-icons/react",
     "@icons-pack/react-simple-icons",
     "@remixicon/react",
     
-    // Solana and related dependencies
+    // Core Web3 dependencies
     "@solana/web3.js",
     "@solana/wallet-adapter-base",
     "@solana/wallet-adapter-react",
     "@solana/wallet-adapter-react-ui",
+    
+    // Essential utilities
     "bs58",
-    "bigint-buffer",
-    "superstruct",
-    "rpc-websockets",
-    // Bundle the entire jayson package instead of specific paths
-    "jayson",
-    "bn.js",
-    "borsh",
+    "tweetnacl",
+    "buffer",
   ],
 }
