@@ -52,6 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
         context: { user },
       })
     } catch (error) {
+      console.log(error)
       return json({ error: "Failed to create wallet" }, { status: 400 })
     }
   }

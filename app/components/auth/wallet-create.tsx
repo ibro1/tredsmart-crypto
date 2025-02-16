@@ -99,7 +99,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
         { method: "post", action: "/auth/wallet" }
       )
     } catch (err) {
-      console.log(error)
+      console.log(err)
       setError(err instanceof Error ? err.message : "Verification failed")
       setVerifyWord(prev => ({ ...prev, word: "" }))
     }
