@@ -9,6 +9,8 @@ import * as bip39 from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english'
 import { useWallet } from "@solana/wallet-adapter-react"
 import bs58 from "bs58"
+import { sign } from '@noble/ed25519'
+import { Buffer } from 'buffer'
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<"generate" | "backup" | "verify">("generate")
@@ -82,7 +84,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleVerify = useCallback(async () => {
     try {
-      if (!currentKeypair || !signMessage) {
+      if (!currentKeypair) {
         throw new Error("Wallet not properly generated")
       }
 
@@ -94,17 +96,17 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
         throw new Error("Incorrect word")
       }
 
-      // Sign message for authentication
+      // Create and sign authentication message using the keypair directly
       const message = `Sign in to TredSmart\nNonce: ${Date.now()}`
-      const encodedMessage = new TextEncoder().encode(message)
-      const signature = await signMessage(encodedMessage)
+      const messageBytes = new TextEncoder().encode(message)
+      const signature = await sign(messageBytes, currentKeypair.secretKey.slice(0, 32))
       
       fetcher.submit(
         { 
           publicKey: currentKeypair.publicKey.toBase58(),
           action: "create",
           message,
-          signature: bs58.encode(signature)
+          signature: bs58.encode(Buffer.from(signature))
         },
         { method: "post", action: "/auth/wallet" }
       )
@@ -113,7 +115,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
       setError(err instanceof Error ? err.message : "Verification failed")
       setVerifyWord(prev => ({ ...prev, word: "" }))
     }
-  }, [mnemonic, verifyWord, currentKeypair, signMessage, fetcher])
+  }, [mnemonic, verifyWord, currentKeypair, fetcher])
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
