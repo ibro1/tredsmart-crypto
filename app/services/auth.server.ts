@@ -44,6 +44,13 @@ authenticator.use(formStrategy, AuthStrategies.FORM)
 authenticator.use(githubStrategy, AuthStrategies.GITHUB)
 authenticator.use(googleStrategy, AuthStrategies.GOOGLE)
 
+function generateUsername(publicKey: string): string {
+  // Create a username like "solana_1abc" using the first 4 chars of the public key
+  const prefix = "solana"
+  const suffix = publicKey.slice(0, 4).toLowerCase()
+  return `${prefix}_${suffix}`
+}
+
 // Update the Solana wallet strategy
 authenticator.use(
   {
@@ -74,18 +81,33 @@ authenticator.use(
           throw new Error("Invalid signature")
         }
 
-        // Find or create user without requiring email
+        // Find or create user with generated username
         let user = await db.user.findUnique({
           where: { publicKey },
         })
 
         if (!user) {
-          user = await db.user.create({
-            data: {
-              publicKey,
-              // No email required
-            },
-          })
+          // Generate a base username
+          let username = generateUsername(publicKey)
+          let suffix = 1
+
+          // Keep trying until we find a unique username
+          while (true) {
+            try {
+              user = await db.user.create({
+                data: {
+                  publicKey,
+                  username: username,
+                  fullname: `Solana User ${username}`, // Required field
+                },
+              })
+              break
+            } catch (e) {
+              // If username exists, try next suffix
+              username = generateUsername(publicKey) + suffix
+              suffix++
+            }
+          }
         }
 
         return { id: user.id, publicKey: user.publicKey }
