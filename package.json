@@ -1,5 +1,5 @@
 {
-  "name": "tredsmart",
+  "name": "payflow",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -33,7 +33,7 @@
     "fix:prettier": "prettier --cache --write '**/*.{js,mjs,cjs,ts,tsx,json,md,mdx}'",
     "fix:prisma": "prisma format && prisma validate",
     "fix:stylelint": "stylelint --cache --fix ./app/styles/*.css",
-    "postinstall": "prisma generate && patch-package",
+    "postinstall": "prisma generate",
     "knip": "knip",
     "prod:db:deploy": "dotenv -e .env.production prisma migrate deploy",
     "prod:check:data": "dotenv -e .env.production tsx prisma/utils/check-data.ts",
