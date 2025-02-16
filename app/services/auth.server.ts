@@ -35,16 +35,11 @@ export type AuthStrategy = (typeof AuthStrategies)[keyof typeof AuthStrategies]
 // Create a single authenticator instance
 const authenticator = new Authenticator<UserSession>(authStorage)
 
-// Add the existing strategies
-authenticator.use(formStrategy, AuthStrategies.FORM)
-authenticator.use(githubStrategy, AuthStrategies.GITHUB)
-authenticator.use(googleStrategy, AuthStrategies.GOOGLE)
-
-// Update the Solana wallet strategy to handle both creation and login
+// Add Solana wallet strategy
 authenticator.use(
   {
     name: "solana-wallet",
-    async authenticate(request) {  // Remove unused parameters
+    async authenticate(request) {
       const form = await request.formData()
       const publicKey = form.get("publicKey") as string
       const action = form.get("action") as string
@@ -54,7 +49,7 @@ authenticator.use(
       }
 
       try {
-        // Find existing user
+        // Find or create user
         let user = await db.user.findUnique({
           where: { publicKey },
           select: {
@@ -64,7 +59,6 @@ authenticator.use(
           }
         })
 
-        // For creation flow, create new user if doesn't exist
         if (action === "create" && !user) {
           const username = `user_${publicKey.slice(0, 8)}${Math.floor(Math.random() * 1000)}`
           user = await db.user.create({
@@ -87,9 +81,9 @@ authenticator.use(
           throw new Error("User not found")
         }
 
+        // Return session data in the format expected by the authenticator
         return {
-          id: user.id,
-          publicKey: user.publicKey,
+          id: user.id
         }
       } catch (error) {
         console.error("Wallet auth error:", error)
@@ -100,12 +94,15 @@ authenticator.use(
   "solana-wallet"
 )
 
-// Export the auth service with helper methods
+// Add other strategies
+authenticator.use(formStrategy, AuthStrategies.FORM)
+authenticator.use(githubStrategy, AuthStrategies.GITHUB)
+authenticator.use(googleStrategy, AuthStrategies.GOOGLE)
+
 export const authService = {
   authenticate: authenticator.authenticate.bind(authenticator),
   isAuthenticated: authenticator.isAuthenticated.bind(authenticator),
   logout: authenticator.logout.bind(authenticator),
 }
 
-// Export the authenticator for direct access when needed
 export { authenticator }
