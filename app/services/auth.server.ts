@@ -9,6 +9,7 @@ import { githubStrategy } from "~/services/auth-strategies/github.strategy"
 import { googleStrategy } from "~/services/auth-strategies/google.strategy"
 import { convertDaysToSeconds } from "~/utils/datetime"
 import { isProduction, parsedEnv } from "~/utils/env.server"
+import { verifySignature } from "~/utils/solana.server"
 
 export const authStorage = createCookieSessionStorage({
   cookie: {
@@ -24,7 +25,7 @@ export const authStorage = createCookieSessionStorage({
 
 export interface UserSession {
   id: string
-  publicKey?: string
+  publicKey: string // Remove optionality
 }
 
 export interface UserData
@@ -43,11 +44,17 @@ authenticator.use(
       const form = await request.formData()
       const publicKey = form.get("publicKey") as string
       const action = form.get("action") as string
+      const signature = form.get("signature") as string;
+      if (!publicKey || !signature) throw new Error("Missing authentication data");
 
-      if (!publicKey) {
-        throw new Error("Missing public key")
-      }
-
+// Verify cryptographic signature
+const isValid = await verifySignature(
+  publicKey,
+  signature,
+  "Sign in to MyApp" // Add nonce in production
+);
+if (!isValid) throw new Error("Invalid signature");
+console.log("Signature verified");
       try {
         // Find or create user
         let user = await db.user.findUnique({
@@ -81,10 +88,9 @@ authenticator.use(
           throw new Error("User not found")
         }
 
-        // Return session data in the format expected by the authenticator
-        return {
-          id: user.id
-        }
+       // Return session data
+       return { id: user.id, publicKey: user.publicKey };
+
       } catch (error) {
         console.error("Wallet auth error:", error)
         throw new Error(error instanceof Error ? error.message : "Authentication failed")
@@ -92,7 +98,7 @@ authenticator.use(
     }
   },
   "solana-wallet"
-)
+);
 
 // Add other strategies
 authenticator.use(formStrategy, AuthStrategies.FORM)
