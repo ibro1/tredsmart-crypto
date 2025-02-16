@@ -51,18 +51,38 @@ authenticator.use(
     async authenticate(request) {
       const form = await request.formData()
       const publicKey = form.get("publicKey") as string
-      const signature = form.get("signature") as string
-      const message = form.get("message") as string
-
-      if (!publicKey || !signature || !message) {
-        throw new Error("Missing authentication details")
+      const action = request.method === "POST" ? form.get("action")?.toString() : ""
+      
+      if (!publicKey) {
+        throw new Error("Missing public key")
       }
-
+      
       try {
-        // Convert public key string to PublicKey object
-        const pubKey = new PublicKey(publicKey)
+        // If action is "create", skip signature verification
+        if (action === "create") {
+          // Find or create user without signature and message
+          let user = await db.user.findUnique({ where: { publicKey } })
+          if (!user) {
+            // Create new user (fill required fields as needed)
+            user = await db.user.create({
+              data: {
+                publicKey,
+                // ...other necessary default fields...
+              },
+            })
+          }
+          return { id: user.id, publicKey: user.publicKey }
+        }
         
-        // Verify signature
+        // Otherwise, require signature and message for login flow
+        const signature = form.get("signature") as string
+        const message = form.get("message") as string
+        
+        if (!signature || !message) {
+          throw new Error("Missing signature details")
+        }
+        
+        const pubKey = new PublicKey(publicKey)
         const messageBytes = new TextEncoder().encode(message)
         const signatureBytes = bs58.decode(signature)
         
@@ -71,25 +91,24 @@ authenticator.use(
           signatureBytes,
           pubKey.toBytes()
         )
-
+        
         if (!isValid) {
           throw new Error("Invalid signature")
         }
-
-        // Find or create user
-        let user = await db.user.findUnique({
-          where: { publicKey },
-        })
-
+        
+        let user = await db.user.findUnique({ where: { publicKey } })
         if (!user) {
           user = await db.user.create({
-            data: { publicKey },
+            data: {
+              publicKey,
+              // ...other necessary default fields...
+            },
           })
         }
-
         return { id: user.id, publicKey: user.publicKey }
       } catch (error) {
-        throw new Error(`Authentication failed: ${error.message}`)
+        console.error("Authentication error:", error)
+        throw new Error(`Authentication failed: ${error instanceof Error ? error.message : "Unknown error"}`)
       }
     },
   },
