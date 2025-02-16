@@ -7,6 +7,8 @@ import { Keypair } from "@solana/web3.js"
 import { useFetcher } from "@remix-run/react"
 import * as bip39 from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english'
+import { useWallet } from "@solana/wallet-adapter-react"
+import bs58 from "bs58"
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<"generate" | "backup" | "verify">("generate")
@@ -17,6 +19,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [hasCopied, setHasCopied] = useState(false)
   const [currentKeypair, setCurrentKeypair] = useState<Keypair | null>(null)
   const fetcher = useFetcher()
+  const { signMessage } = useWallet()
 
   // Clear sensitive data on unmount
   useEffect(() => () => {
@@ -79,7 +82,7 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleVerify = useCallback(async () => {
     try {
-      if (!currentKeypair) {
+      if (!currentKeypair || !signMessage) {
         throw new Error("Wallet not properly generated")
       }
 
@@ -91,19 +94,26 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
         throw new Error("Incorrect word")
       }
 
+      // Sign message for authentication
+      const message = `Sign in to TredSmart\nNonce: ${Date.now()}`
+      const encodedMessage = new TextEncoder().encode(message)
+      const signature = await signMessage(encodedMessage)
+      
       fetcher.submit(
         { 
           publicKey: currentKeypair.publicKey.toBase58(),
-          action: "create" 
+          action: "create",
+          message,
+          signature: bs58.encode(signature)
         },
         { method: "post", action: "/auth/wallet" }
       )
     } catch (err) {
-      console.log(err)
+      console.error(err)
       setError(err instanceof Error ? err.message : "Verification failed")
       setVerifyWord(prev => ({ ...prev, word: "" }))
     }
-  }, [mnemonic, verifyWord, currentKeypair, fetcher])
+  }, [mnemonic, verifyWord, currentKeypair, signMessage, fetcher])
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-12">
