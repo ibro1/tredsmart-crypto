@@ -44,7 +44,7 @@ authenticator.use(formStrategy, AuthStrategies.FORM)
 authenticator.use(githubStrategy, AuthStrategies.GITHUB)
 authenticator.use(googleStrategy, AuthStrategies.GOOGLE)
 
-// Add Solana wallet strategy
+// Update the Solana wallet strategy
 authenticator.use(
   {
     name: "solana-wallet",
@@ -59,10 +59,8 @@ authenticator.use(
       }
 
       try {
-        // Convert public key string to PublicKey object
-        const pubKey = new PublicKey(publicKey)
-        
         // Verify signature
+        const pubKey = new PublicKey(publicKey)
         const messageBytes = new TextEncoder().encode(message)
         const signatureBytes = bs58.decode(signature)
         
@@ -76,14 +74,17 @@ authenticator.use(
           throw new Error("Invalid signature")
         }
 
-        // Find or create user
+        // Find or create user without requiring email
         let user = await db.user.findUnique({
           where: { publicKey },
         })
 
         if (!user) {
           user = await db.user.create({
-            data: { publicKey },
+            data: {
+              publicKey,
+              // No email required
+            },
           })
         }
 

@@ -27,9 +27,9 @@ generator client {
 // -----------------------------------------------------------------------------
 
 model User {
-  id String @id @default(cuid())
-
-  email    String  @unique
+  id        String   @id @default(cuid())
+  publicKey String   @unique
+  email     String?  // Make email optional
   username String  @unique
   phone    String? @unique // numeric string
 
@@ -116,7 +116,7 @@ model Permission {
   roles Role[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now())
 
   @@unique([action, entity, access])
 }
