@@ -1,29 +1,3 @@
-// import { json, type ActionFunctionArgs } from "@remix-run/node"
-// import { createWalletAuthSession, verifyWalletSignature } from "~/services/wallet-auth.server"
-
-// export async function action({ request }: ActionFunctionArgs) {
-//   const formData = await request.formData()
-//   const message = formData.get("message")
-//   const signature = formData.get("signature")
-//   const publicKey = formData.get("publicKey")
-//   const redirectTo = (formData.get("redirectTo") as string) || "/dashboard"
-
-//   if (
-//     typeof message !== "string" ||
-//     typeof signature !== "string" ||
-//     typeof publicKey !== "string"
-//   ) {
-//     return json({ error: "Invalid form data" }, { status: 400 })
-//   }
-
-//   const isValid = await verifyWalletSignature(message, signature, publicKey)
-//   if (!isValid) {
-//     return json({ error: "Invalid signature" }, { status: 400 })
-//   }
-
-//   return createWalletAuthSession(publicKey, redirectTo)
-// }
-
 import { json, redirect, type ActionFunctionArgs } from "@remix-run/node"
 import { db } from "~/libs/db.server"
 import { authenticator } from "~/services/auth.server"
@@ -36,9 +10,9 @@ function generateUsername(publicKey: string): string {
 
 export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData()
-  const action = form.get("action")
+  const actionType = form.get("action")
 
-  if (action === "create") {
+  if (actionType === "create") {
     const publicKey = form.get("publicKey")
     if (typeof publicKey !== "string") {
       throw new Error("Invalid public key")
@@ -56,7 +30,8 @@ export async function action({ request }: ActionFunctionArgs) {
         },
       })
 
-      return authenticator.authenticate("solana-wallet", request, {
+      // Use a clone of the request since its body was already consumed
+      return authenticator.authenticate("solana-wallet", request.clone(), {
         successRedirect: "/dashboard",
         failureRedirect: "/login",
         context: { user },
@@ -67,8 +42,8 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  // Handle normal wallet connection
-  return authenticator.authenticate("solana-wallet", request, {
+  // For normal wallet connection, also pass a cloned request
+  return authenticator.authenticate("solana-wallet", request.clone(), {
     successRedirect: "/dashboard",
     failureRedirect: "/login",
   })

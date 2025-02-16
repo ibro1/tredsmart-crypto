@@ -57,9 +57,8 @@ authenticator.use(
   {
     name: "solana-wallet",
     async authenticate(request) {
-      // Clone request to avoid stream locking
-      const clonedRequest = request.clone()
-      const form = await clonedRequest.formData()
+      // Remove cloning here so that we use the passed-in request
+      const form = await request.formData()
       const publicKey = form.get("publicKey") as string
       const signature = form.get("signature") as string
       const message = form.get("message") as string
