@@ -9,7 +9,9 @@ function generateUsername(publicKey: string): string {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const form = await request.formData()
+  // Clone the request BEFORE reading body
+  const reqClone = request.clone()
+  const form = await reqClone.formData()
   const actionType = form.get("action")
 
   if (actionType === "create") {
@@ -30,8 +32,8 @@ export async function action({ request }: ActionFunctionArgs) {
         },
       })
 
-      // Use a clone of the request since its body was already consumed
-      return authenticator.authenticate("solana-wallet", request.clone(), {
+      // Pass the original request (which remains unconsumed)
+      return authenticator.authenticate("solana-wallet", request, {
         successRedirect: "/dashboard",
         failureRedirect: "/login",
         context: { user },
@@ -42,8 +44,8 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  // For normal wallet connection, also pass a cloned request
-  return authenticator.authenticate("solana-wallet", request.clone(), {
+  // For normal wallet connection, pass the original request
+  return authenticator.authenticate("solana-wallet", request, {
     successRedirect: "/dashboard",
     failureRedirect: "/login",
   })
