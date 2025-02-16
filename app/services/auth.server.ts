@@ -56,47 +56,47 @@ function generateUsername(publicKey: string): string {
 authenticator.use(
   {
     name: "solana-wallet",
-    async authenticate(request) {
+    async authenticate(request, sessionStorage, options) {
       const form = await request.formData()
-      const reqAction = form.get("action")?.toString()
       const publicKey = form.get("publicKey") as string
-
+      
       if (!publicKey) {
-        throw new Error("Missing authentication details")
+        throw new Error("Missing public key")
       }
 
-      // If action is "create", skip signature verification
-      if (reqAction === "create") {
+      try {
+        // For both create and login, first check if user exists
         let user = await db.user.findUnique({
           where: { publicKey },
           select: { id: true, publicKey: true, username: true },
         })
 
-        if (!user) {
-          const username = generateUsername(publicKey)
-          user = await db.user.create({
-            data: {
-              publicKey,
-              username,
-              fullname: `Wallet ${publicKey.slice(0, 6)}`,
-              walletAddress: publicKey,
-              walletConnectedAt: new Date(),
-            },
-            select: { id: true, publicKey: true, username: true },
-          })
+        // If action is "create" or user doesn't exist
+        if (options?.context?.action === "create" || !user) {
+          if (!user) {
+            const username = generateUsername(publicKey)
+            user = await db.user.create({
+              data: {
+                publicKey,
+                username,
+                fullname: `Wallet ${publicKey.slice(0, 6)}`,
+                walletAddress: publicKey,
+                walletConnectedAt: new Date(),
+              },
+              select: { id: true, publicKey: true, username: true },
+            })
+          }
+          return user
         }
-        return user
-      }
 
-      // Normal login flow: require signature and message
-      const signature = form.get("signature") as string
-      const message = form.get("message") as string
+        // For login flow, verify signature
+        const signature = form.get("signature") as string
+        const message = form.get("message") as string
 
-      if (!signature || !message) {
-        throw new Error("Missing authentication details")
-      }
+        if (!signature || !message) {
+          throw new Error("Missing signature details")
+        }
 
-      try {
         const pubKey = new PublicKey(publicKey)
         const messageBytes = new TextEncoder().encode(message)
         const signatureBytes = bs58.decode(signature)
@@ -105,31 +105,16 @@ authenticator.use(
           signatureBytes,
           pubKey.toBytes()
         )
-        if (!isValid) throw new Error("Invalid signature")
 
-        // Lookup or create user as needed
-        let user = await db.user.findUnique({
-          where: { publicKey },
-          select: { id: true, publicKey: true, username: true },
-        })
-        if (!user) {
-          const username = generateUsername(publicKey)
-          user = await db.user.create({
-            data: {
-              publicKey,
-              username,
-              fullname: `Wallet ${publicKey.slice(0, 6)}`,
-              walletAddress: publicKey,
-              walletConnectedAt: new Date(),
-            },
-            select: { id: true, publicKey: true, username: true },
-          })
+        if (!isValid) {
+          throw new Error("Invalid signature")
         }
+
         return user
       } catch (error) {
         console.error("Authentication error:", error)
         throw new Error(
-          `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          `Authentication failed: ${error instanceof Error ? error.message : "Unknown error"}`
         )
       }
     },

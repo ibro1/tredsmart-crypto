@@ -1,60 +1,17 @@
-import { json, redirect, type ActionFunctionArgs } from "@remix-run/node"
-import { db } from "~/libs/db.server"
+import { json, type ActionFunctionArgs } from "@remix-run/node"
 import { authenticator } from "~/services/auth.server"
 
-function generateUsername(publicKey: string): string {
-  const base = publicKey.slice(0, 8).toLowerCase()
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-  return `user_${base}${random}`
-}
-
 export async function action({ request }: ActionFunctionArgs) {
-  // Clone the request BEFORE reading body
-  const reqClone = request.clone()
-  const form = await reqClone.formData()
+  // Clone the request before reading
+  const clone = request.clone()
+  const form = await clone.formData()
   const actionType = form.get("action")
 
-  if (actionType === "create") {
-    const publicKey = form.get("publicKey")
-    if (typeof publicKey !== "string") {
-      throw new Error("Invalid public key")
-    }
-
-    try {
-      // Look for an existing user
-      let user = await db.user.findUnique({
-        where: { publicKey },
-      })
-
-      // If user doesn't exist, create a new one
-      if (!user) {
-        const username = generateUsername(publicKey)
-        user = await db.user.create({
-          data: {
-            publicKey,
-            username,
-            fullname: `Wallet ${publicKey.slice(0, 6)}`,
-            walletAddress: publicKey,
-            walletConnectedAt: new Date(),
-          },
-        })
-      }
-
-      // Pass the original request (which remains unconsumed)
-      return authenticator.authenticate("solana-wallet", request, {
-        successRedirect: "/dashboard",
-        failureRedirect: "/login",
-        context: { user },
-      })
-    } catch (error) {
-      console.error("Wallet creation error:", error)
-      return json({ error: "Failed to create wallet" }, { status: 400 })
-    }
-  }
-
-  // For normal wallet connection, pass the original request
+  // Pass through to authenticator with original request
   return authenticator.authenticate("solana-wallet", request, {
-    successRedirect: "/dashboard",
+    successRedirect: "/user/dashboard",
     failureRedirect: "/login",
+    // Pass action type so auth strategy knows what to do
+    context: { action: actionType },
   })
 }
