@@ -57,7 +57,9 @@ authenticator.use(
   {
     name: "solana-wallet",
     async authenticate(request) {
-      const form = await request.formData()
+      // Clone request to avoid stream locking
+      const clonedRequest = request.clone()
+      const form = await clonedRequest.formData()
       const publicKey = form.get("publicKey") as string
       const signature = form.get("signature") as string
       const message = form.get("message") as string
@@ -84,9 +86,14 @@ authenticator.use(
           throw new Error("Invalid signature")
         }
 
-        // Find or create user with username
+        // Find or create user
         let user = await db.user.findUnique({
           where: { publicKey },
+          select: {
+            id: true,
+            publicKey: true,
+            username: true,
+          },
         })
 
         if (!user) {
@@ -99,12 +106,18 @@ authenticator.use(
               walletAddress: publicKey,
               walletConnectedAt: new Date(),
             },
+            select: {
+              id: true,
+              publicKey: true,
+              username: true,
+            },
           })
         }
 
-        return { id: user.id, publicKey: user.publicKey }
+        return user
       } catch (error) {
-        throw new Error(`Authentication failed: ${error.message}`)
+        console.error("Authentication error:", error)
+        throw new Error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     },
   },
