@@ -57,42 +57,19 @@ authenticator.use(
   {
     name: "solana-wallet",
     async authenticate(request) {
-      // Remove cloning here so that we use the passed-in request
       const form = await request.formData()
+      const reqAction = form.get("action")?.toString()
       const publicKey = form.get("publicKey") as string
-      const signature = form.get("signature") as string
-      const message = form.get("message") as string
 
-      if (!publicKey || !signature || !message) {
+      if (!publicKey) {
         throw new Error("Missing authentication details")
       }
 
-      try {
-        // Convert public key string to PublicKey object
-        const pubKey = new PublicKey(publicKey)
-        
-        // Verify signature
-        const messageBytes = new TextEncoder().encode(message)
-        const signatureBytes = bs58.decode(signature)
-        
-        const isValid = web3.nacl.sign.detached.verify(
-          messageBytes,
-          signatureBytes,
-          pubKey.toBytes()
-        )
-
-        if (!isValid) {
-          throw new Error("Invalid signature")
-        }
-
-        // Find or create user
+      // If action is "create", skip signature verification
+      if (reqAction === "create") {
         let user = await db.user.findUnique({
           where: { publicKey },
-          select: {
-            id: true,
-            publicKey: true,
-            username: true,
-          },
+          select: { id: true, publicKey: true, username: true },
         })
 
         if (!user) {
@@ -101,22 +78,59 @@ authenticator.use(
             data: {
               publicKey,
               username,
-              fullname: `Wallet ${publicKey.slice(0, 6)}`, // Default name
+              fullname: `Wallet ${publicKey.slice(0, 6)}`,
               walletAddress: publicKey,
               walletConnectedAt: new Date(),
             },
-            select: {
-              id: true,
-              publicKey: true,
-              username: true,
-            },
+            select: { id: true, publicKey: true, username: true },
           })
         }
+        return user
+      }
 
+      // Normal login flow: require signature and message
+      const signature = form.get("signature") as string
+      const message = form.get("message") as string
+
+      if (!signature || !message) {
+        throw new Error("Missing authentication details")
+      }
+
+      try {
+        const pubKey = new PublicKey(publicKey)
+        const messageBytes = new TextEncoder().encode(message)
+        const signatureBytes = bs58.decode(signature)
+        const isValid = web3.nacl.sign.detached.verify(
+          messageBytes,
+          signatureBytes,
+          pubKey.toBytes()
+        )
+        if (!isValid) throw new Error("Invalid signature")
+
+        // Lookup or create user as needed
+        let user = await db.user.findUnique({
+          where: { publicKey },
+          select: { id: true, publicKey: true, username: true },
+        })
+        if (!user) {
+          const username = generateUsername(publicKey)
+          user = await db.user.create({
+            data: {
+              publicKey,
+              username,
+              fullname: `Wallet ${publicKey.slice(0, 6)}`,
+              walletAddress: publicKey,
+              walletConnectedAt: new Date(),
+            },
+            select: { id: true, publicKey: true, username: true },
+          })
+        }
         return user
       } catch (error) {
         console.error("Authentication error:", error)
-        throw new Error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        throw new Error(
+          `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
       }
     },
   },
