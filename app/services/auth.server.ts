@@ -1,6 +1,7 @@
 import { type Prisma } from "@prisma/client"
 import { createCookieSessionStorage } from "@remix-run/node"
 import { Authenticator } from "remix-auth"
+import { db } from "~/libs/db.server"
 import { type modelUser } from "~/models/user.server"
 import { AuthStrategies } from "~/services/auth-strategies"
 import { formStrategy } from "~/services/auth-strategies/form.strategy"
