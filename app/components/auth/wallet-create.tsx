@@ -7,10 +7,6 @@ import { Keypair } from "@solana/web3.js"
 import { useFetcher } from "@remix-run/react"
 import * as bip39 from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english'
-import { useWallet } from "@solana/wallet-adapter-react"
-import bs58 from "bs58"
-import { sign } from '@noble/ed25519'
-import { Buffer } from 'buffer'
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<"generate" | "backup" | "verify">("generate")
@@ -21,7 +17,13 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [hasCopied, setHasCopied] = useState(false)
   const [currentKeypair, setCurrentKeypair] = useState<Keypair | null>(null)
   const fetcher = useFetcher()
-  const { signMessage } = useWallet()
+
+  // New: Redirect to dashboard if wallet creation is successful
+  useEffect(() => {
+    if (fetcher.data && !fetcher.data.error) {
+      window.location.href = "/dashboard"
+    }
+  }, [fetcher.data])
 
   // Clear sensitive data on unmount
   useEffect(() => () => {
@@ -31,14 +33,12 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
 
   const handleGenerateWallet = useCallback(async () => {
     try {
-      // Generate wallet with 24 words (256 bits)
-      const newMnemonic = bip39.generateMnemonic(wordlist, 256)
+      // Generate wallet with 12 words (128 bits)
+      const newMnemonic = bip39.generateMnemonic(wordlist, 128)
       setMnemonic(newMnemonic)
 
       // Convert mnemonic to seed
       const seed = await bip39.mnemonicToSeed(newMnemonic)
-      
-      // Create keypair from first 32 bytes of seed
       const keypair = Keypair.fromSeed(seed.slice(0, 32))
       
       setCurrentKeypair(keypair)
@@ -96,22 +96,15 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
         throw new Error("Incorrect word")
       }
 
-      // Create and sign authentication message using the keypair directly
-      const message = `Sign in to TredSmart\nNonce: ${Date.now()}`
-      const messageBytes = new TextEncoder().encode(message)
-      const signature = await sign(messageBytes, currentKeypair.secretKey.slice(0, 32))
-      
       fetcher.submit(
         { 
           publicKey: currentKeypair.publicKey.toBase58(),
-          action: "create",
-          message,
-          signature: bs58.encode(Buffer.from(signature))
+          action: "create" 
         },
         { method: "post", action: "/auth/wallet" }
       )
     } catch (err) {
-      console.error(err)
+      console.log(err)
       setError(err instanceof Error ? err.message : "Verification failed")
       setVerifyWord(prev => ({ ...prev, word: "" }))
     }
@@ -152,39 +145,43 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
             <div className="text-center">
               <h1 className="text-2xl font-bold">Backup Recovery Phrase</h1>
               <p className="mt-2 text-muted-foreground">
-                Write down these 24 words in order. This is your master key.
+                Write down these 12 words in order and keep them safe. You'll need them to recover your wallet.
               </p>
             </div>
 
-            <div className="mt-8 space-y-4">
-              <div className="relative">
-                <div className="rounded-lg border bg-muted p-4 font-mono text-sm">
-                  {showPhrase ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      {mnemonic.split(" ").map((word, i) => (
-                        <div key={i} className="text-xs">
-                          <span className="text-muted-foreground">{i + 1}.</span>
-                          {word}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                      {Array.from({ length: 24 }).map((_, i) => (
-                        <div key={i} className="text-xs">
-                          <span className="text-muted-foreground">{i + 1}.</span>
-                          ••••••
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="absolute right-2 top-2 flex gap-2">
+            <div className="mt-8 space-y-6">
+              <div className="relative rounded-lg border bg-muted/50 p-6">
+                {showPhrase ? (
+                  <div className="grid grid-cols-3 gap-4">
+                    {mnemonic.split(" ").map((word, i) => (
+                      <div 
+                        key={i} 
+                        className="flex items-center rounded-md bg-background p-2 text-sm"
+                      >
+                        <span className="mr-2 text-xs text-muted-foreground">
+                          {(i + 1).toString().padStart(2, '0')}
+                        </span>
+                        <span className="font-mono">{word}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <div 
+                        key={i} 
+                    ))}
+                  </div>
+                )}
+
+                <div className="absolute -top-3 right-4 flex gap-2 rounded-full bg-background px-2 py-1 shadow-sm">
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-8 w-8 rounded-full p-0"
                     onClick={handleCopyPhrase}
                     disabled={!showPhrase}
+                    title="Copy phrase"
                   >
                     {hasCopied ? (
                       <IconCheck className="h-4 w-4 text-green-500" />
@@ -195,7 +192,9 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-8 w-8 rounded-full p-0"
                     onClick={() => setShowPhrase(!showPhrase)}
+                    title={showPhrase ? "Hide phrase" : "Show phrase"}
                   >
                     {showPhrase ? (
                       <IconEyeOff className="h-4 w-4" />
@@ -206,6 +205,12 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
                 </div>
               </div>
 
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-900/50 dark:bg-yellow-900/20">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  🔐 Never share your recovery phrase. Anyone with these words can access your wallet.
+                </p>
+              </div>
+
               <div className="flex gap-4">
                 <Button
                   variant="outline"
@@ -213,10 +218,14 @@ export default function WalletCreate({ onBack }: { onBack: () => void }) {
                   onClick={handleDownload}
                 >
                   <IconDownload className="mr-2 h-4 w-4" />
-                  Export Secure File
+                  Save Backup
                 </Button>
-                <Button className="flex-1" onClick={startVerification}>
-                  Verify Backup
+                <Button 
+                  className="flex-1" 
+                  onClick={startVerification}
+                  disabled={!showPhrase}
+                >
+                  I Saved It
                 </Button>
               </div>
             </div>
