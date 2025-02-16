@@ -7,7 +7,6 @@ import { Keypair } from "@solana/web3.js"
 import { useFetcher } from "@remix-run/react"
 import * as bip39 from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english'
-import { sha512 } from '@noble/hashes/sha512'
 
 export default function WalletCreate({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<"generate" | "backup" | "verify">("generate")
