@@ -21,16 +21,24 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     try {
-      const username = generateUsername(publicKey)
-      const user = await db.user.create({
-        data: {
-          publicKey,
-          username,
-          fullname: `Wallet ${publicKey.slice(0, 6)}`,
-          walletAddress: publicKey,
-          walletConnectedAt: new Date(),
-        },
+      // Look for an existing user
+      let user = await db.user.findUnique({
+        where: { publicKey },
       })
+
+      // If user doesn't exist, create a new one
+      if (!user) {
+        const username = generateUsername(publicKey)
+        user = await db.user.create({
+          data: {
+            publicKey,
+            username,
+            fullname: `Wallet ${publicKey.slice(0, 6)}`,
+            walletAddress: publicKey,
+            walletConnectedAt: new Date(),
+          },
+        })
+      }
 
       // Pass the original request (which remains unconsumed)
       return authenticator.authenticate("solana-wallet", request, {
