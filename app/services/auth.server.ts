@@ -44,7 +44,7 @@ authenticator.use(googleStrategy, AuthStrategies.GOOGLE)
 authenticator.use(
   {
     name: "solana-wallet",
-    async authenticate(request, sessionStorage, options) {
+    async authenticate(request) {  // Remove unused parameters
       const form = await request.formData()
       const publicKey = form.get("publicKey") as string
       const action = form.get("action") as string
@@ -53,43 +53,47 @@ authenticator.use(
         throw new Error("Missing public key")
       }
 
-      // Find existing user
-      let user = await db.user.findUnique({
-        where: { publicKey },
-        select: {
-          id: true,
-          publicKey: true,
-          username: true,
-        }
-      })
-
-      // For creation flow, create new user if doesn't exist
-      if (action === "create" && !user) {
-        const username = `user_${publicKey.slice(0, 8)}${Math.floor(Math.random() * 1000)}`
-        user = await db.user.create({
-          data: {
-            publicKey,
-            username,
-            fullname: `Wallet ${publicKey.slice(0, 6)}`,
-            walletAddress: publicKey,
-            walletConnectedAt: new Date(),
-          },
+      try {
+        // Find existing user
+        let user = await db.user.findUnique({
+          where: { publicKey },
           select: {
             id: true,
             publicKey: true,
             username: true,
           }
         })
-      }
 
-      if (!user) {
-        throw new Error("User not found")
-      }
+        // For creation flow, create new user if doesn't exist
+        if (action === "create" && !user) {
+          const username = `user_${publicKey.slice(0, 8)}${Math.floor(Math.random() * 1000)}`
+          user = await db.user.create({
+            data: {
+              publicKey,
+              username,
+              fullname: `Wallet ${publicKey.slice(0, 6)}`,
+              walletAddress: publicKey,
+              walletConnectedAt: new Date(),
+            },
+            select: {
+              id: true,
+              publicKey: true,
+              username: true,
+            }
+          })
+        }
 
-      // Return session data
-      return {
-        id: user.id,
-        publicKey: user.publicKey,
+        if (!user) {
+          throw new Error("User not found")
+        }
+
+        return {
+          id: user.id,
+          publicKey: user.publicKey,
+        }
+      } catch (error) {
+        console.error("Wallet auth error:", error)
+        throw new Error(error instanceof Error ? error.message : "Authentication failed")
       }
     }
   },
