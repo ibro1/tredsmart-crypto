@@ -44,14 +44,15 @@ authenticator.use(formStrategy, AuthStrategies.FORM)
 authenticator.use(githubStrategy, AuthStrategies.GITHUB)
 authenticator.use(googleStrategy, AuthStrategies.GOOGLE)
 
+// Add helper function to generate username from public key
 function generateUsername(publicKey: string): string {
-  // Create a username like "solana_1abc" using the first 4 chars of the public key
-  const prefix = "solana"
-  const suffix = publicKey.slice(0, 4).toLowerCase()
-  return `${prefix}_${suffix}`
+  // Take first 8 characters of public key and add random numbers
+  const base = publicKey.slice(0, 8).toLowerCase()
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+  return `user_${base}${random}`
 }
 
-// Update the Solana wallet strategy
+// Update Solana wallet strategy
 authenticator.use(
   {
     name: "solana-wallet",
@@ -66,8 +67,10 @@ authenticator.use(
       }
 
       try {
-        // Verify signature
+        // Convert public key string to PublicKey object
         const pubKey = new PublicKey(publicKey)
+        
+        // Verify signature
         const messageBytes = new TextEncoder().encode(message)
         const signatureBytes = bs58.decode(signature)
         
@@ -81,33 +84,22 @@ authenticator.use(
           throw new Error("Invalid signature")
         }
 
-        // Find or create user with generated username
+        // Find or create user with username
         let user = await db.user.findUnique({
           where: { publicKey },
         })
 
         if (!user) {
-          // Generate a base username
-          let username = generateUsername(publicKey)
-          let suffix = 1
-
-          // Keep trying until we find a unique username
-          while (true) {
-            try {
-              user = await db.user.create({
-                data: {
-                  publicKey,
-                  username: username,
-                  fullname: `Solana User ${username}`, // Required field
-                },
-              })
-              break
-            } catch (e) {
-              // If username exists, try next suffix
-              username = generateUsername(publicKey) + suffix
-              suffix++
-            }
-          }
+          const username = generateUsername(publicKey)
+          user = await db.user.create({
+            data: {
+              publicKey,
+              username,
+              fullname: `Wallet ${publicKey.slice(0, 6)}`, // Default name
+              walletAddress: publicKey,
+              walletConnectedAt: new Date(),
+            },
+          })
         }
 
         return { id: user.id, publicKey: user.publicKey }
